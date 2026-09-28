@@ -21,6 +21,14 @@ The animation above is a screen recording, shown at 3x speed, of the agent runni
 | **Activity trail** | Every run records status, tool actions, findings, and the final answer, and the dashboard shows the trail alongside the result. |
 | **File attachments** | Attach files to a task, and the agent can upload local files (such as a resume) into web forms. |
 | **Follow-up in the same session** | Continue a finished task and the agent keeps its earlier context instead of starting cold. |
+| **Approval gate** | Tick "Ask before the final submit" and the agent does all the preparation, stops one step before the irreversible action, and waits. Approve or reject from the dashboard and it resumes in the same session. |
+| **QA mode** | Point the agent at a product you are allowed to test and it reports findings as structured data (severity, category, URL, repro steps, expected vs actual), shown as a findings list. |
+| **Batch runs from a spreadsheet** | Upload a .csv or .xlsx and a `{{column}}` instruction: one task is queued per row. Rows that repeat an earlier key (for example a company already handled in a previous batch) are skipped. |
+| **Task templates** | Save a prompt once and reuse it from a dropdown. |
+| **Structured output** | Describe the JSON you want back and get it parsed and stored with the task. |
+| **Cost and model per run** | Every run records the model used and its token and dollar cost, summed across all steps. |
+| **Model fallback** | Set several models in `INTENT_AGENT_MODEL` and the daemon moves to the next when one fails (quota, auth, network). |
+| **Self-healing** | If the browser tool connection dies, the daemon restarts the agent server and retries once. Tasks interrupted by a daemon restart are marked failed rather than left running. |
 | **Personal context** | Private Markdown files in `context/` (profile, preferences, file locations) are loaded into each new session, so the agent does not need to be told the same things twice. |
 | **Stops when stuck** | On a CAPTCHA, OTP, login challenge, or input it cannot determine, the run ends as `needs_attention`, uploads a screenshot, and can email you. |
 | **Consequence policy** | Browsing, reading, and filling in forms are automatic. Submitting, sending, paying, or deleting only happens when your task explicitly asks for it. |
@@ -60,9 +68,9 @@ Reach for something else when:
 
 ## Current limitations
 
-- UX and bug findings are the model's observations in the final answer and activity trail, not a structured bug report. Reproduce each one before filing it.
-- One task runs at a time on a device, and there is no batch or spreadsheet-driven mode yet.
-- The activity trail is assembled after the model responds, with a 15-second heartbeat while it works, rather than streamed step by step.
+- QA findings are the model's observations, and a research study of AI web-testing agents reported many false positives. Reproduce each finding before filing it.
+- One task runs at a time on a device. A batch queues one task per row and works through them in order.
+- The activity trail (every tool call and reasoning step) is assembled after the model responds, with a 15-second heartbeat while it works, rather than streamed step by step.
 - The agent's own screenshot call can time out on long-lived browser sessions; restarting the daemon clears it.
 - Setup scripts assume Windows and a dedicated Chrome debug profile.
 - There is no automated test suite yet.
@@ -148,7 +156,7 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_token_if_uploads_are_enabled
 | `DASHBOARD_SECRET` | For public deployments | Protects dashboard pages and APIs with a login cookie or bearer token; auth is disabled when unset |
 | `BLOB_READ_WRITE_TOKEN` | For attachments | Lets `/api/uploads` store files in Vercel Blob |
 
-The app creates missing tables and indexes on first use. If a database predates the current `run_events.seq` column, migrate that existing table before using task-event views; schema bootstrap does not alter older table definitions.
+The app creates missing tables, columns and indexes on first use, including migrating older `run_events` tables that lack the `seq` column or an `id` default.
 
 ### Daemon
 
@@ -162,7 +170,7 @@ The daemon reads configuration from its process environment:
 | `POLL_INTERVAL_MS` | `3000` | Delay between queue polls |
 | `INTENT_AGENT_PROJECT_DIR` | current directory | Working directory exposed to the OpenCode session |
 | `INTENT_AGENT_CONTEXT_DIR` | `<project>/context` | Directory containing private Markdown context |
-| `INTENT_AGENT_MODEL` | `github-copilot/claude-sonnet-5` | OpenCode provider/model pair |
+| `INTENT_AGENT_MODEL` | `github-copilot/claude-sonnet-5` | OpenCode provider/model pair, or a comma-separated fallback chain such as `github-copilot/claude-sonnet-5,ollama-cloud/nemotron-3-super` |
 | `PORT` | `3333` | Port for the daemon's direct `POST /tasks` endpoint |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | unset | Optional SMTP transport for attention alerts |
 | `NOTIFY_EMAIL` | `SMTP_USER` | Optional alert recipient |
@@ -202,7 +210,10 @@ Tasks move through these states:
 queued -> running -> completed
                   -> failed
                   -> needs_attention
+                  -> awaiting_approval
 ```
+
+`awaiting_approval` means the agent prepared a final action and is waiting for you to approve or reject it.
 
 `needs_attention` is reserved for blockers such as CAPTCHA, OTP, login challenges, or missing user input. When configured, the daemon uploads the latest Chrome screenshot and sends an email alert. OpenCode output becomes available after a response is committed, so the daemon emits a lightweight heartbeat every 15 seconds while longer requests are in flight.
 
@@ -222,6 +233,8 @@ Run the current quality gates from the repository root:
 npm run lint -w apps/web
 npm run build -w apps/web
 npx tsc -p apps/daemon/tsconfig.json --noEmit
+npm test -w apps/daemon
+node --import tsx --test apps/web/src/lib/batch.test.ts
 ```
 
-The repository currently has no automated test suite; lint, production build, daemon type-check, and an end-to-end browser task are the available verification layers.
+Unit tests cover the daemon's marker parsing, prompt building and model fallback chain, and the web app's CSV, template and duplicate-detection logic. Browser behaviour is verified by running end-to-end tasks against the live daemon.

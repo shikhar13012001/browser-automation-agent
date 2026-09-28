@@ -2,9 +2,10 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createOpencode, type OpencodeClient } from "@opencode-ai/sdk";
 import type { Part, TextPartInput, FilePartInput } from "@opencode-ai/sdk";
+import { isRecoverableToolFailure, parseModelChain } from "./markers.js";
 
 const PROJECT_DIR = process.env.INTENT_AGENT_PROJECT_DIR ?? process.cwd();
-const MODEL = process.env.INTENT_AGENT_MODEL ?? "github-copilot/claude-sonnet-5";
+const MODEL_CHAIN = parseModelChain(process.env.INTENT_AGENT_MODEL);
 const CONTEXT_DIR = process.env.INTENT_AGENT_CONTEXT_DIR ?? join(PROJECT_DIR, "context");
 
 let cachedContext: string | undefined;
@@ -25,13 +26,28 @@ async function loadContext(): Promise<string> {
 }
 
 let client: OpencodeClient | undefined;
+let server: { close(): void } | undefined;
 
 async function getClient(): Promise<OpencodeClient> {
   if (!client) {
     const opencode = await createOpencode();
     client = opencode.client;
+    server = opencode.server;
   }
   return client;
+}
+
+// Recreates the embedded OpenCode server, which also respawns its MCP subprocesses (e.g. the
+// Chrome DevTools connection). Without this a dead browser-tool connection fails every later
+// task with "Not connected" until the whole daemon is restarted by hand.
+export function resetClient(): void {
+  try {
+    server?.close();
+  } catch (err) {
+    console.error("[agent] failed to close opencode server", err);
+  }
+  client = undefined;
+  server = undefined;
 }
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -60,9 +76,13 @@ function textFromParts(parts: Part[]): string {
     .join("\n");
 }
 
+export type Usage = { inputTokens: number; outputTokens: number; cost: number };
+
 export type RunResult = {
   output: string;
   sessionId: string;
+  model: string;
+  usage: Usage;
 };
 
 export type RunEventKind = "status" | "plan" | "action" | "verification" | "finding" | "attention" | "error" | "result";
@@ -88,15 +108,102 @@ function emitBreakdown(parts: Part[], onEvent: OnEvent): void {
   }
 }
 
+// MCP servers report a dead connection either as a tool error or as a normal, short tool result
+// ("Not connected"). Long outputs are skipped so page content that happens to contain those words
+// (snapshots, extracted text) can never trigger a restart.
+const MAX_ERROR_OUTPUT_CHARS = 300;
+
+function toolFailureText(parts: Part[]): string {
+  return parts
+    .flatMap((part) => {
+      if (part.type !== "tool") return [];
+      if (part.state.status === "error") return [part.state.error];
+      if (part.state.status === "completed" && part.state.output.length <= MAX_ERROR_OUTPUT_CHARS) return [part.state.output];
+      return [];
+    })
+    .join("\n");
+}
+
+async function collectTurn(
+  c: OpencodeClient,
+  sessionId: string,
+  startedAt: number,
+): Promise<{ parts: Part[]; usage: Usage } | undefined> {
+  try {
+    const res = await c.session.messages({ path: { id: sessionId }, query: { directory: PROJECT_DIR } });
+    if (!res.data) return undefined;
+    // Same machine, but allow a little clock slack between this process and the OpenCode server.
+    const turn = res.data.filter((m) => m.info.role === "assistant" && m.info.time.created >= startedAt - 2000);
+    if (turn.length === 0) return undefined;
+    const usage: Usage = { inputTokens: 0, outputTokens: 0, cost: 0 };
+    for (const m of turn) {
+      if (m.info.role !== "assistant") continue;
+      usage.inputTokens += m.info.tokens.input + m.info.tokens.cache.read + m.info.tokens.cache.write;
+      usage.outputTokens += m.info.tokens.output + m.info.tokens.reasoning;
+      usage.cost += m.info.cost;
+    }
+    return { parts: turn.flatMap((m) => m.parts), usage };
+  } catch (err) {
+    console.error("[agent] could not read the turn back from the session", err);
+    return undefined;
+  }
+}
+
+// Tries each model in INTENT_AGENT_MODEL (comma-separated) in order. A model attempt counts as failed
+// when the call throws or OpenCode reports a provider error (quota, auth, network). A dead browser-tool
+// connection instead recreates the OpenCode server once and retries the same model.
 export async function runTask(
   prompt: string,
   existingSessionId?: string,
   onEvent: OnEvent = () => {},
   attachments: string[] = [],
 ): Promise<RunResult> {
+  let sessionId = existingSessionId;
+  let recovered = false;
+  let lastError: unknown;
+
+  for (let i = 0; i < MODEL_CHAIN.length; i++) {
+    const model = MODEL_CHAIN[i];
+    for (;;) {
+      try {
+        const result = await runOnce(model, prompt, sessionId, onEvent, attachments);
+        sessionId = result.sessionId;
+        if (!recovered && isRecoverableToolFailure(result.toolErrors)) {
+          recovered = true;
+          onEvent("status", "Browser tool connection was lost. Restarting the agent server and retrying...");
+          resetClient();
+          continue;
+        }
+        return result;
+      } catch (err) {
+        lastError = err;
+        const message = err instanceof Error ? err.message : String(err);
+        if (!recovered && isRecoverableToolFailure(message)) {
+          recovered = true;
+          onEvent("status", "Agent connection was lost. Restarting the agent server and retrying...");
+          resetClient();
+          continue;
+        }
+        if (i + 1 < MODEL_CHAIN.length) {
+          onEvent("status", `Model ${model} failed (${message}). Falling back to ${MODEL_CHAIN[i + 1]}.`);
+        }
+        break;
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+async function runOnce(
+  model: string,
+  prompt: string,
+  existingSessionId: string | undefined,
+  onEvent: OnEvent,
+  attachments: string[],
+): Promise<RunResult & { toolErrors: string }> {
   const c = await getClient();
 
-  const [providerID, modelID] = MODEL.split("/", 2);
+  const [providerID, modelID] = model.split("/", 2);
 
   const isNewSession = !existingSessionId;
   let sessionId = existingSessionId;
@@ -132,6 +239,7 @@ export async function runTask(
   }));
   const textPart: TextPartInput = { type: "text", text: promptText };
 
+  const turnStartedAt = Date.now();
   try {
     const result = await c.session.prompt({
       path: { id: sessionId },
@@ -147,9 +255,29 @@ export async function runTask(
       throw new Error("opencode returned no result for the prompt");
     }
 
-    emitBreakdown(result.data.parts, onEvent);
+    const info = result.data.info;
+    if (info.error) {
+      const detail = "data" in info.error && info.error.data && "message" in info.error.data ? String(info.error.data.message) : info.error.name;
+      throw new Error(`${providerID}/${modelID}: ${detail}`);
+    }
 
-    return { output: textFromParts(result.data.parts), sessionId };
+    // The prompt result only carries the final message's parts. Tool calls and per-step token
+    // usage live on the earlier assistant messages of this turn, so read the whole turn back.
+    const turn = await collectTurn(c, sessionId, turnStartedAt);
+    const turnParts = turn?.parts ?? result.data.parts;
+    emitBreakdown(turnParts, onEvent);
+
+    return {
+      output: textFromParts(result.data.parts),
+      sessionId,
+      model,
+      usage: turn?.usage ?? {
+        inputTokens: info.tokens.input + info.tokens.cache.read + info.tokens.cache.write,
+        outputTokens: info.tokens.output + info.tokens.reasoning,
+        cost: info.cost,
+      },
+      toolErrors: toolFailureText(turnParts),
+    };
   } finally {
     done = true;
     await heartbeat;

@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DeviceStatus } from "@/components/device-status";
-import { PromptBox } from "@/components/prompt-box";
+import { BatchPanel } from "@/components/batch-panel";
+import { PromptBox, type RunOptions } from "@/components/prompt-box";
 import { TaskHistory } from "@/components/task-history";
 import { RunView } from "@/components/run-view";
 import type { Device, RunEvent, StoredTask } from "@/lib/store";
@@ -57,11 +58,11 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [selectedId]);
 
-  async function submit(prompt: string, attachments: string[], continueFrom?: string) {
+  async function submit(prompt: string, options: Partial<RunOptions> = {}, continueFrom?: string) {
     const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, attachments, continueFrom }),
+      body: JSON.stringify({ prompt, ...options, continueFrom }),
     });
     const created: StoredTask = await res.json();
     setTasks((prev) => [created, ...prev]);
@@ -75,10 +76,12 @@ export default function Home() {
         <DeviceStatus devices={devices} now={now} />
       </div>
 
-      <PromptBox onSubmit={(prompt, attachments) => submit(prompt, attachments)} disabled={!!isRunning} />
+      <PromptBox onSubmit={(prompt, options) => submit(prompt, options)} disabled={!!isRunning} />
+
+      <BatchPanel />
 
       {selectedTask && (
-        <RunView task={selectedTask} events={events} onContinue={(p) => submit(p, [], selectedTask.id)} />
+        <RunView task={selectedTask} events={events} onContinue={(p, opts) => submit(p, { attachments: [], ...opts }, selectedTask.id)} />
       )}
 
       <TaskHistory tasks={tasks} selectedId={selectedId} onSelect={(t) => setSelectedId(t.id)} />

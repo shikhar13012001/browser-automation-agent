@@ -1,15 +1,8 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import type { StoredTask, TaskStatus } from "@/lib/store";
-
-const STATUS_VARIANT: Record<TaskStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  queued: "outline",
-  running: "default",
-  completed: "secondary",
-  failed: "destructive",
-  needs_attention: "destructive",
-};
+import { STATUS_VARIANT } from "@/components/run-view";
+import type { StoredTask } from "@/lib/store";
 
 export function TaskHistory({
   tasks,

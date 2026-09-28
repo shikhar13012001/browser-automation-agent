@@ -21,6 +21,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     output: body.output,
     ...(typeof body.sessionId === "string" ? { sessionId: body.sessionId } : {}),
     ...(typeof body.attentionScreenshotUrl === "string" ? { attentionScreenshotUrl: body.attentionScreenshotUrl } : {}),
+    ...(typeof body.model === "string" ? { model: body.model } : {}),
+    ...(body.usage && typeof body.usage === "object"
+      ? {
+          inputTokens: Number(body.usage.inputTokens) || 0,
+          outputTokens: Number(body.usage.outputTokens) || 0,
+          cost: Number(body.usage.cost) || 0,
+        }
+      : {}),
+    ...(body.resultJson !== undefined && body.resultJson !== null ? { resultJson: body.resultJson } : {}),
   });
   if (!task) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
