@@ -6,9 +6,11 @@ Intent Agent turns a natural-language request into a queued task that a daemon e
 
 ## Demo
 
-![Intent Agent demo (36s)](docs/demo/intent-agent-demo.gif)
+![Agent running a real search in Chrome (3x speed)](docs/demo/intent-agent-demo.gif)
 
-The animation above is a silent, reduced-quality copy. [Download the full-quality 36-second video with sound](docs/demo/intent-agent-demo.mp4). It includes a screen recording (shown at 3x speed) of the agent running a real task through the queue and daemon: it opens Google, types "Applied AI engineer jobs India", opens the top organic result and reads the job listings. The dashboard and job-application screens in the video are recreations, and the application details are fictional. The popup region and profile picture in the recording are masked for privacy.
+The animation above is a screen recording, shown at 3x speed, of the agent running a real task through the queue and daemon. It opens Google, types "Applied AI engineer jobs India", opens the top organic result and reads the job listings. The sign-in popup and profile picture in the recording are masked for privacy.
+
+[Download the full 36-second demo video with sound](docs/demo/intent-agent-demo.mp4). Its dashboard and job-application scenes are recreations, and the application details in them are fictional.
 
 ## How it works
 
