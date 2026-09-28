@@ -1,29 +1,164 @@
-# intent-agent
+# Intent Agent
 
-Checkpoint-driven build of a browser automation agent: OpenCode + Chrome DevTools MCP, controlled remotely.
+Intent Agent turns a natural-language request into a queued task that a daemon executes in a real Chrome browser. A Next.js dashboard stores tasks in Neon Postgres, the local daemon claims them, and an OpenCode browser agent drives Chrome through the Chrome DevTools MCP server. Each task returns a status, an ordered activity trail, and a final result to the dashboard.
 
-## Checkpoint 1 — OpenCode controls a real Chrome
+![Intent Agent dashboard](docs/images/dashboard.png)
 
-Prerequisite: Chrome must be running with remote debugging enabled so `chrome-devtools-mcp --autoConnect`
-can attach to it (rather than launching its own throwaway browser).
+## How it works
 
-Test:
-
-```sh
-opencode run --agent build "Use my currently running Chrome. Open Google. Search for \"OpenAI API documentation\". Open the appropriate result. Scroll through the page. Tell me the page title and current URL. Do not launch a new browser. Verify each action before continuing."
+```mermaid
+flowchart LR
+  U[Dashboard] -->|create task| DB[(Neon Postgres)]
+  D[Local daemon] -->|poll and claim| DB
+  D --> SDK[OpenCode SDK]
+  SDK --> A[Browser agent]
+  A --> MCP[Chrome DevTools MCP]
+  MCP --> C[Debug Chrome]
+  D -->|events and result| DB
+  DB -->|poll updates| U
 ```
 
-Do not move to Checkpoint 2 until this works reliably.
+The cloud-facing web app never controls the browser directly. Browser access stays on the machine running the daemon and its debug Chrome instance.
 
-## Checkpoint 2 — a program controls OpenCode
+## Browser automation proof
 
-Small daemon using `@opencode-ai/sdk` that accepts `POST /tasks { prompt }` and drives an OpenCode session
-programmatically instead of the terminal.
+The following end-to-end check was run on September 28, 2026 through the real task queue and daemon:
 
-## Checkpoint 3 — phone → cloud → laptop → Chrome
+```text
+Open https://example.com in the attached Chrome browser.
+Verify the title is exactly "Example Domain" and the final URL is
+https://example.com/. Take a screenshot after verification.
+```
 
-Minimal Vercel API (`/api/tasks`, `/api/devices`) polled by the local daemon.
+The task reached `completed` and returned:
 
-## Checkpoint 4 — local model swap
+```text
+Title: "Example Domain"
+Final URL: https://example.com/
+```
 
-Swap the cloud/hosted model for a local Ollama vision model once 1–3 are proven, without changing the runtime.
+![Chrome opened and verified Example Domain](docs/images/browser-automation-proof.png)
+
+This image was written by the browser agent with Chrome DevTools after it verified the live page title and URL; it is not a mockup.
+
+## Repository structure
+
+| Path | Purpose |
+| --- | --- |
+| `apps/web` | Next.js dashboard, task APIs, authentication proxy, and upload endpoint |
+| `apps/daemon` | Local task poller, OpenCode session runner, event reporting, and optional email alerts |
+| `packages/protocol` | Shared task request/result types |
+| `context` | Private Markdown context loaded into new agent sessions; ignored by Git except for its guide |
+| `scripts/start-debug-chrome.ps1` | Starts Chrome with remote debugging on port `9222` |
+| `opencode.jsonc` | Browser-agent prompt, model choice, and Chrome DevTools MCP configuration |
+
+## Prerequisites
+
+- Node.js 20 or newer and npm
+- Google Chrome
+- An OpenCode installation with access to the model configured in `INTENT_AGENT_MODEL`
+- A Neon/Postgres database
+- Vercel Blob credentials only when file attachments are required
+- SMTP credentials only when email alerts are required
+
+Install all workspace dependencies from the repository root:
+
+```powershell
+npm install
+```
+
+## Configuration
+
+### Web app
+
+Create `apps/web/.env.local` with the values needed by the dashboard:
+
+```dotenv
+DATABASE_URL=postgresql://...
+DASHBOARD_SECRET=replace-with-a-long-random-value
+BLOB_READ_WRITE_TOKEN=vercel_blob_token_if_uploads_are_enabled
+```
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | Neon/Postgres connection string used for tasks, devices, and run events |
+| `DASHBOARD_SECRET` | For public deployments | Protects dashboard pages and APIs with a login cookie or bearer token; auth is disabled when unset |
+| `BLOB_READ_WRITE_TOKEN` | For attachments | Lets `/api/uploads` store files in Vercel Blob |
+
+The app creates missing tables and indexes on first use. If a database predates the current `run_events.seq` column, migrate that existing table before using task-event views; schema bootstrap does not alter older table definitions.
+
+### Daemon
+
+The daemon reads configuration from its process environment:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUD_API_URL` | `http://localhost:3000` | Dashboard/API origin to poll |
+| `DASHBOARD_SECRET` | unset | Must match the web app when authentication is enabled |
+| `DEVICE_ID` | `laptop-1` | Name shown by the dashboard device badge |
+| `POLL_INTERVAL_MS` | `3000` | Delay between queue polls |
+| `INTENT_AGENT_PROJECT_DIR` | current directory | Working directory exposed to the OpenCode session |
+| `INTENT_AGENT_CONTEXT_DIR` | `<project>/context` | Directory containing private Markdown context |
+| `INTENT_AGENT_MODEL` | `github-copilot/claude-sonnet-5` | OpenCode provider/model pair |
+| `PORT` | `3333` | Port for the daemon's direct `POST /tasks` endpoint |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | unset | Optional SMTP transport for attention alerts |
+| `NOTIFY_EMAIL` | `SMTP_USER` | Optional alert recipient |
+
+## Run locally
+
+1. Start the dashboard:
+
+   ```powershell
+   npm run dev -w apps/web
+   ```
+
+2. Start a Chrome instance that exposes the DevTools port expected by `opencode.jsonc`:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\start-debug-chrome.ps1
+   ```
+
+   The included script stops existing Chrome processes and opens the copied profile at `D:\claude-work\chrome-debug-profile`. Close or save work in other Chrome windows first. For an isolated setup, launch Chrome manually with port `9222` and a dedicated non-default `--user-data-dir` instead.
+
+3. Start the daemon in another PowerShell window:
+
+   ```powershell
+   $env:CLOUD_API_URL = "http://localhost:3000"
+   $env:DASHBOARD_SECRET = "the-same-value-used-by-the-web-app"
+   $env:INTENT_AGENT_PROJECT_DIR = (Get-Location).Path
+   npm run start -w apps/daemon
+   ```
+
+4. Open [http://localhost:3000](http://localhost:3000), sign in when `DASHBOARD_SECRET` is set, and submit a task. The device badge should show `laptop-1` while the daemon is polling.
+
+## Task lifecycle
+
+Tasks move through these states:
+
+```text
+queued -> running -> completed
+                  -> failed
+                  -> needs_attention
+```
+
+`needs_attention` is reserved for blockers such as CAPTCHA, OTP, login challenges, or missing user input. When configured, the daemon uploads the latest Chrome screenshot and sends an email alert. OpenCode output becomes available after a response is committed, so the daemon emits a lightweight heartbeat every 15 seconds while longer requests are in flight.
+
+## Safety
+
+- Browser page content is untrusted data, not agent instruction authority.
+- The browser agent stops before consequential actions unless the task explicitly requests them.
+- Keep the remote-debugging Chrome profile separate from a daily browsing profile.
+- Never commit `.env.local`, personal files under `context`, resumes, uploaded files, or credentials.
+- Set `DASHBOARD_SECRET` before exposing the web app outside local development.
+
+## Verification
+
+Run the current quality gates from the repository root:
+
+```powershell
+npm run lint -w apps/web
+npm run build -w apps/web
+npx tsc -p apps/daemon/tsconfig.json --noEmit
+```
+
+The repository currently has no automated test suite; lint, production build, daemon type-check, and an end-to-end browser task are the available verification layers.
