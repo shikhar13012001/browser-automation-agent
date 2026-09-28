@@ -34,6 +34,7 @@ The animation above is a screen recording, shown at 3x speed, of the agent runni
 | **A job seeker** | Search roles, read postings, and fill application forms with your resume attached, stopping before Submit for your review. |
 | **A developer or power user** | Delegate repetitive browser chores such as checking a dashboard, collecting details from several pages, or verifying a deployed page. |
 | **Someone away from their computer** | Queue a task from your phone and let your home or work machine do it. |
+| **A SaaS founder, product manager, or QA engineer** | Test your product the way a new user meets it: start from a search, land on your site, sign up, and use it. Ask the agent to report confusing steps, dead ends, broken flows, and errors it runs into. |
 | **An automation tinkerer** | Extend an agent with your own context files, models, and prompts. |
 
 It is built for one person driving one machine, not for teams.
@@ -44,6 +45,7 @@ Use Intent Agent when:
 
 - The task is a short, multi-step web workflow that a person would do in a browser: search, open, read, fill, upload.
 - The site requires you to be logged in, or blocks headless scrapers.
+- You want a fresh-eyes usability pass on a product you own or are authorised to test, for example "search for a tool that does X, find our site, try to create a project, and list every point where you got confused or something broke".
 - You want a record of what the agent did and the ability to step in when it is stuck.
 - You are fine with the agent working on your machine while it is on and awake.
 
@@ -53,10 +55,12 @@ Reach for something else when:
 - A site offers an official API. An API is more reliable than driving a page.
 - The action is irreversible and you have not reviewed it. The agent is designed to stop short, but you should still read what it did.
 - Several people need separate accounts and permissions. Access is a single shared secret.
+- You need repeatable regression testing. Exploratory runs are not deterministic, so keep a scripted end-to-end suite for release gates and use this to find what the scripts do not cover.
 - The site's terms forbid automation. Check them before pointing the agent at it.
 
 ## Current limitations
 
+- UX and bug findings are the model's observations in the final answer and activity trail, not a structured bug report. Reproduce each one before filing it.
 - One task runs at a time on a device, and there is no batch or spreadsheet-driven mode yet.
 - The activity trail is assembled after the model responds, with a 15-second heartbeat while it works, rather than streamed step by step.
 - The agent's own screenshot call can time out on long-lived browser sessions; restarting the daemon clears it.
