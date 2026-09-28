@@ -4,6 +4,12 @@ Intent Agent turns a natural-language request into a queued task that a daemon e
 
 ![Intent Agent dashboard](docs/images/dashboard.png)
 
+## Demo
+
+[![Intent Agent demo video (36s)](docs/images/demo-poster.jpg)](docs/demo/intent-agent-demo.mp4)
+
+[Watch the 36-second demo](docs/demo/intent-agent-demo.mp4). It includes a screen recording (shown at 3x speed) of the agent running a real task through the queue and daemon: it opens Google, types "Applied AI engineer jobs India", opens the top organic result and reads the job listings. The dashboard and job-application screens in the video are recreations, and the application details are fictional. The popup region and profile picture in the recording are masked for privacy.
+
 ## How it works
 
 ```mermaid
@@ -39,7 +45,7 @@ Final URL: https://example.com/
 
 ![Chrome opened and verified Example Domain](docs/images/browser-automation-proof.png)
 
-This image was written by the browser agent with Chrome DevTools after it verified the live page title and URL; it is not a mockup.
+The screenshot was captured from the same debug Chrome instance over the Chrome DevTools Protocol; it is not a mockup. The agent's own `take_screenshot` call timed out during this session, so the image was taken directly rather than by the agent.
 
 ## Repository structure
 
