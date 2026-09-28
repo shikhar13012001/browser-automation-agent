@@ -12,6 +12,57 @@ The animation above is a screen recording, shown at 3x speed, of the agent runni
 
 [Download the full 36-second demo video with sound](docs/demo/intent-agent-demo.mp4). Its dashboard and job-application scenes are recreations, and the application details in them are fictional.
 
+## Features
+
+| Feature | What it does |
+| --- | --- |
+| **Plain-English tasks** | Type what you want done ("search for Applied AI roles and open the top result") and it is queued from the dashboard, including from your phone once deployed. |
+| **Your real, logged-in Chrome** | Tasks run in a Chrome you already use, so sites that need your sessions and cookies work without handing credentials to a third party. |
+| **Activity trail** | Every run records status, tool actions, findings, and the final answer, and the dashboard shows the trail alongside the result. |
+| **File attachments** | Attach files to a task, and the agent can upload local files (such as a resume) into web forms. |
+| **Follow-up in the same session** | Continue a finished task and the agent keeps its earlier context instead of starting cold. |
+| **Personal context** | Private Markdown files in `context/` (profile, preferences, file locations) are loaded into each new session, so the agent does not need to be told the same things twice. |
+| **Stops when stuck** | On a CAPTCHA, OTP, login challenge, or input it cannot determine, the run ends as `needs_attention`, uploads a screenshot, and can email you. |
+| **Consequence policy** | Browsing, reading, and filling in forms are automatic. Submitting, sending, paying, or deleting only happens when your task explicitly asks for it. |
+| **Untrusted-page defense** | Text on web pages is treated as data, never as instructions, which limits prompt-injection from the sites the agent visits. |
+| **Private by design** | The hosted app only stores tasks and results. Browser control stays on your machine, and access is gated by a shared secret. |
+
+## Who it is for
+
+| You are... | Typical use |
+| --- | --- |
+| **A job seeker** | Search roles, read postings, and fill application forms with your resume attached, stopping before Submit for your review. |
+| **A developer or power user** | Delegate repetitive browser chores such as checking a dashboard, collecting details from several pages, or verifying a deployed page. |
+| **Someone away from their computer** | Queue a task from your phone and let your home or work machine do it. |
+| **An automation tinkerer** | Extend an agent with your own context files, models, and prompts. |
+
+It is built for one person driving one machine, not for teams.
+
+## When to use it
+
+Use Intent Agent when:
+
+- The task is a short, multi-step web workflow that a person would do in a browser: search, open, read, fill, upload.
+- The site requires you to be logged in, or blocks headless scrapers.
+- You want a record of what the agent did and the ability to step in when it is stuck.
+- You are fine with the agent working on your machine while it is on and awake.
+
+Reach for something else when:
+
+- You need high-volume or scheduled scraping. Tasks run one at a time, so a purpose-built scraper or API will be faster and cheaper.
+- A site offers an official API. An API is more reliable than driving a page.
+- The action is irreversible and you have not reviewed it. The agent is designed to stop short, but you should still read what it did.
+- Several people need separate accounts and permissions. Access is a single shared secret.
+- The site's terms forbid automation. Check them before pointing the agent at it.
+
+## Current limitations
+
+- One task runs at a time on a device, and there is no batch or spreadsheet-driven mode yet.
+- The activity trail is assembled after the model responds, with a 15-second heartbeat while it works, rather than streamed step by step.
+- The agent's own screenshot call can time out on long-lived browser sessions; restarting the daemon clears it.
+- Setup scripts assume Windows and a dedicated Chrome debug profile.
+- There is no automated test suite yet.
+
 ## How it works
 
 ```mermaid
