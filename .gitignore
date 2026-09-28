@@ -1,0 +1,13 @@
+node_modules/
+.next/
+dist/
+*.log
+
+# personal data -- never commit
+context/*
+!context/README.md
+.data/
+apps/web/public/uploads/
+resumes/
+
+# local chrome debug profile lives outside the repo (D:\claude-work\chrome-debug-profile), nothing here to ignore for it

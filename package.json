@@ -1,0 +1,8 @@
+{
+  "name": "intent-agent",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "daemon",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@intent-agent/protocol": "*",
+    "@opencode-ai/sdk": "^1.18.32",
+    "nodemailer": "^10.0.11"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "@types/nodemailer": "^8.0.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
