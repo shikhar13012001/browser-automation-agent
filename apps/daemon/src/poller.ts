@@ -57,8 +57,8 @@ function extractAttention(output: string): string | undefined {
   return match?.[1]?.trim();
 }
 
-async function uploadScreenshot(taskId: string): Promise<string | undefined> {
-  const path = await findLatestScreenshot();
+async function uploadScreenshot(taskId: string, taskStartedAt: number): Promise<string | undefined> {
+  const path = await findLatestScreenshot(taskStartedAt);
   if (!path) return undefined;
   try {
     const bytes = await readFile(path);
@@ -87,6 +87,7 @@ async function pollOnce(): Promise<void> {
     `[poller] running task ${task.id}${task.sessionId ? ` (continuing session ${task.sessionId})` : ""}: ${task.prompt}`,
   );
 
+  const taskStartedAt = Date.now();
   let output: string;
   let sessionId: string | undefined;
   try {
@@ -111,7 +112,7 @@ async function pollOnce(): Promise<void> {
 
   try {
     if (attentionDescription) {
-      const screenshotUrl = await uploadScreenshot(task.id);
+      const screenshotUrl = await uploadScreenshot(task.id, taskStartedAt);
       await reportResult(task.id, "needs_attention", output, sessionId, screenshotUrl);
       console.log(`[poller] task ${task.id} needs attention: ${attentionDescription}`);
       await sendAttentionEmail({
@@ -119,6 +120,7 @@ async function pollOnce(): Promise<void> {
         prompt: task.prompt,
         description: attentionDescription,
         dashboardUrl: `${CLOUD_API_URL}/`,
+        taskStartedAt,
       });
     } else {
       await reportResult(task.id, "completed", output, sessionId);

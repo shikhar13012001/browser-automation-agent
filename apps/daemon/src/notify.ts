@@ -26,9 +26,11 @@ function getTransporter() {
 
 // chrome-devtools-mcp writes each screenshot to its own %TEMP%\chrome-devtools-mcp-<id>\screenshot.png.
 // There's no API to ask "what did the last task screenshot" directly, so we find the most
-// recently modified one across all such directories -- good enough since only one task runs
-// at a time on this daemon.
-export async function findLatestScreenshot(): Promise<string | undefined> {
+// recently modified one across all such directories. Stale directories accumulate across a long
+// daemon uptime (one per chrome-devtools-mcp process spawn), so `notBeforeMs` -- the timestamp the
+// current task started -- is required: without it this can silently return a screenshot from a
+// completely unrelated, much earlier task.
+export async function findLatestScreenshot(notBeforeMs: number): Promise<string | undefined> {
   const root = tmpdir();
   let entries: string[];
   try {
@@ -43,6 +45,7 @@ export async function findLatestScreenshot(): Promise<string | undefined> {
     const screenshotPath = join(root, entry, "screenshot.png");
     try {
       const info = await stat(screenshotPath);
+      if (info.mtimeMs < notBeforeMs) continue;
       if (!latest || info.mtimeMs > latest.mtimeMs) {
         latest = { path: screenshotPath, mtimeMs: info.mtimeMs };
       }
@@ -58,6 +61,7 @@ export async function sendAttentionEmail(params: {
   prompt: string;
   description: string;
   dashboardUrl?: string;
+  taskStartedAt: number;
 }): Promise<void> {
   const t = getTransporter();
   if (!t) {
@@ -71,7 +75,7 @@ export async function sendAttentionEmail(params: {
     return;
   }
 
-  const screenshotPath = await findLatestScreenshot();
+  const screenshotPath = await findLatestScreenshot(params.taskStartedAt);
   const lines = [
     `Task: ${params.prompt}`,
     "",

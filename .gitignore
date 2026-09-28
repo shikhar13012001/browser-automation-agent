@@ -11,3 +11,9 @@ apps/web/public/uploads/
 resumes/
 
 # local chrome debug profile lives outside the repo (D:\claude-work\chrome-debug-profile), nothing here to ignore for it
+
+# generated /brag video assets (large binaries, not shippable app code)
+brag-output/
+
+# local Claude Code settings
+.claude/
