@@ -1,10 +1,17 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createOpencode, type OpencodeClient } from "@opencode-ai/sdk";
 import type { Part, TextPartInput, FilePartInput } from "@opencode-ai/sdk";
 import { isRecoverableToolFailure, parseModelChain } from "./markers.js";
 
-const PROJECT_DIR = process.env.INTENT_AGENT_PROJECT_DIR ?? process.cwd();
+// process.cwd() is NOT a reliable default here: `npm run start -w apps/daemon` (and similar
+// workspace-script invocations) sets it to apps/daemon, not the repo root, silently breaking
+// CONTEXT_DIR below unless INTENT_AGENT_PROJECT_DIR is set explicitly by whoever launches this.
+// Resolve from this file's own location instead (apps/daemon/src/agent.ts -> repo root) so the
+// default is correct regardless of how or from where the process was started.
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const PROJECT_DIR = process.env.INTENT_AGENT_PROJECT_DIR ?? REPO_ROOT;
 const MODEL_CHAIN = parseModelChain(process.env.INTENT_AGENT_MODEL);
 const MODEL_TIMEOUT_MS = Number(process.env.INTENT_AGENT_MODEL_TIMEOUT_MS ?? 240_000);
 const CONTEXT_DIR = process.env.INTENT_AGENT_CONTEXT_DIR ?? join(PROJECT_DIR, "context");
@@ -16,11 +23,15 @@ async function loadContext(): Promise<string> {
   try {
     const entries = await readdir(CONTEXT_DIR);
     const files = entries.filter((f) => f.toLowerCase() !== "readme.md" && f.endsWith(".md")).sort();
+    if (files.length === 0) {
+      console.warn(`[agent] no context files found in ${CONTEXT_DIR} -- new sessions will start with no personal context`);
+    }
     const sections = await Promise.all(
       files.map(async (f) => `## ${f}\n\n${await readFile(join(CONTEXT_DIR, f), "utf-8")}`),
     );
     cachedContext = sections.join("\n\n");
-  } catch {
+  } catch (err) {
+    console.error(`[agent] could not read context from ${CONTEXT_DIR} -- new sessions will start with no personal context`, err);
     cachedContext = "";
   }
   return cachedContext;
