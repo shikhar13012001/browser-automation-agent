@@ -6,6 +6,7 @@ import { isRecoverableToolFailure, parseModelChain } from "./markers.js";
 
 const PROJECT_DIR = process.env.INTENT_AGENT_PROJECT_DIR ?? process.cwd();
 const MODEL_CHAIN = parseModelChain(process.env.INTENT_AGENT_MODEL);
+const MODEL_TIMEOUT_MS = Number(process.env.INTENT_AGENT_MODEL_TIMEOUT_MS ?? 240_000);
 const CONTEXT_DIR = process.env.INTENT_AGENT_CONTEXT_DIR ?? join(PROJECT_DIR, "context");
 
 let cachedContext: string | undefined;
@@ -241,15 +242,25 @@ async function runOnce(
 
   const turnStartedAt = Date.now();
   try {
-    const result = await c.session.prompt({
-      path: { id: sessionId },
-      query: { directory: PROJECT_DIR },
-      body: {
-        agent: "browser",
-        model: { providerID, modelID },
-        parts: [textPart, ...fileParts],
-      },
-    });
+    // A rate-limited or exhausted provider can hang indefinitely instead of erroring -- observed
+    // directly (Copilot sat on "Still working" heartbeats past 270s with zero tool activity, never
+    // throwing, so the model-fallback chain below never triggered). This bounds a single attempt so
+    // a stuck call fails fast and the chain moves to the next model. The timed-out call isn't
+    // cancelled server-side (the SDK exposes no abort), it's just no longer waited on here.
+    const result = await Promise.race([
+      c.session.prompt({
+        path: { id: sessionId },
+        query: { directory: PROJECT_DIR },
+        body: {
+          agent: "browser",
+          model: { providerID, modelID },
+          parts: [textPart, ...fileParts],
+        },
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`${providerID}/${modelID} timed out after ${MODEL_TIMEOUT_MS / 1000}s`)), MODEL_TIMEOUT_MS),
+      ),
+    ]);
 
     if (!result.data) {
       throw new Error("opencode returned no result for the prompt");

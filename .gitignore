@@ -9,6 +9,7 @@ context/*
 .data/
 apps/web/public/uploads/
 resumes/
+apps/daemon/.env
 
 # local chrome debug profile lives outside the repo (D:\claude-work\chrome-debug-profile), nothing here to ignore for it
 

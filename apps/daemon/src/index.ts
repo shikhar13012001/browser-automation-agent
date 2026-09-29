@@ -1,3 +1,6 @@
+// Must be the first import: agent.ts and poller.ts read process.env into module-level consts
+// at import time, so .env has to be loaded before those modules are evaluated.
+import "dotenv/config";
 import { createServer } from "node:http";
 import type { Task, TaskResult } from "./task.js";
 import { runTask } from "./agent.js";
