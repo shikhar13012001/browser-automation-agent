@@ -32,6 +32,13 @@ function getTransporter() {
 // completely unrelated, much earlier task.
 export async function findLatestScreenshot(notBeforeMs: number): Promise<string | undefined> {
   const root = tmpdir();
+  // intent-browser (the default browser tool) saves the viewport after every action to one fixed file.
+  const own = join(root, "intent-browser", "latest.jpg");
+  try {
+    if ((await stat(own)).mtimeMs >= notBeforeMs) return own;
+  } catch {
+    // not using intent-browser, fall back to chrome-devtools-mcp's per-process files
+  }
   let entries: string[];
   try {
     entries = await readdir(root);
@@ -62,6 +69,8 @@ export async function sendAttentionEmail(params: {
   description: string;
   dashboardUrl?: string;
   taskStartedAt: number;
+  // "Needs attention" (blocked, waiting for you) or "Failed" (gave up); shown in the subject.
+  kind?: string;
 }): Promise<void> {
   const t = getTransporter();
   if (!t) {
@@ -88,9 +97,9 @@ export async function sendAttentionEmail(params: {
     await t.sendMail({
       from: SMTP_USER,
       to: NOTIFY_EMAIL,
-      subject: `[Agent] Needs attention: ${params.prompt.slice(0, 60)}`,
+      subject: `[Agent] ${params.kind ?? "Needs attention"}: ${params.prompt.slice(0, 60)}`,
       text: lines.join("\n"),
-      attachments: screenshotPath ? [{ filename: "screenshot.png", path: screenshotPath }] : [],
+      attachments: screenshotPath ? [{ filename: screenshotPath.endsWith(".jpg") ? "screenshot.jpg" : "screenshot.png", path: screenshotPath }] : [],
     });
     console.log(`[notify] sent attention email for task ${params.taskId}`);
   } catch (err) {

@@ -1,0 +1,9 @@
+persona,first_name,last_name,email,phone_code,phone,city,experience,behaviour
+Careful fresher,Priya,Sharma,priya.sharma@example.com,+91 India,9876543210,Pune,Less than 1 year,"Before ticking the consent box, open and read the privacy policy."
+Senior engineer,Arjun,Mehta,arjun.mehta@example.com,+91 India,9812345670,Bengaluru,6+ years,Fill everything in normally.
+Long surname,Lakshmi,Venkataraghavan-Subramaniam,lakshmi.v@example.com,+91 India,9900112233,Chennai,3-5 years,Check the confirmation page carefully against what you entered.
+Applying from Spain,Carlos,Garcia,carlos.garcia@example.com,+34 Spain,612345678,Bengaluru,1-2 years,You live in Spain and are relocating; use your Spanish phone number.
+Double-checker,Dev,Patel,dev.patel@example.com,+91 India,9988776655,Hyderabad,1-2 years,"On step 2, go Back to step 1 to double-check your details, then continue."
+In a hurry,Neha,Rao,neha.rao@example.com,+91 India,9123456780,Mumbai,1-2 years,"First try to continue past step 1 without entering a phone number and note what the form says, then fill it in."
+Plus-address user,Sam,Iyer,sam+northwind@example.com,+91 India,9000011111,Pune,3-5 years,You always use plus-addressing for job applications; keep that email.
+Happy path,Ravi,Kumar,ravi.kumar@example.com,+91 India,9555500000,Bengaluru,1-2 years,Fill everything in normally.

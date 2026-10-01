@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Widget zoo | Intent Agent robustness fixture</title>
+<!--
+  Each widget reproduces how a popular UI library actually behaves (event it listens to, where its
+  popup is rendered, what covers what), because those details are what make agents fail on real
+  sites. Every widget records its outcome in window.ZOO so the test checks the result, not the click.
+-->
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; color: #111; }
+  header.sticky { position: sticky; top: 0; background: #1d2433; color: #fff; padding: 10px 16px; z-index: 20; }
+  main { max-width: 760px; margin: 0 auto; padding: 8px 16px 400px; }
+  section { border: 1px solid #ddd; border-radius: 8px; padding: 12px 14px; margin: 14px 0; }
+  section h2 { font-size: 15px; margin: 0 0 8px; }
+  label { font-weight: 600; }
+  input[type=text], input[type=email], input[type=tel], textarea { padding: 6px; font-size: 14px; width: 260px; }
+  .btn { background: #0a58ca; color: #fff; border: 0; border-radius: 6px; padding: 7px 14px; cursor: pointer; font-size: 14px; }
+  .btn[disabled] { background: #9bb; cursor: not-allowed; }
+  .trigger { border: 1px solid #999; border-radius: 6px; padding: 6px 10px; background: #fff; min-width: 180px; text-align: left; cursor: pointer; display: inline-block; }
+  .pop { position: absolute; background: #fff; border: 1px solid #aaa; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.2); z-index: 100; min-width: 180px; }
+  .pop [role=option], .pop .rs-option { padding: 6px 10px; cursor: pointer; }
+  .pop [role=option]:hover, .pop .rs-option:hover { background: #eef; }
+  .rs-control { border: 1px solid #999; border-radius: 4px; width: 260px; display: flex; align-items: center; padding: 2px 6px; cursor: default; }
+  .rs-control input { border: 0; outline: 0; width: 100%; font-size: 14px; padding: 4px; }
+  .rs-placeholder { color: #888; position: absolute; pointer-events: none; padding-left: 4px; }
+  .backdrop { position: fixed; inset: 0; z-index: 90; background: transparent; }
+  .cal { padding: 8px; }
+  .cal .grid { display: grid; grid-template-columns: repeat(7, 32px); gap: 2px; }
+  .cal .grid button { border: 0; background: #f4f4f4; padding: 6px 0; cursor: pointer; }
+  .switch { width: 44px; height: 24px; border-radius: 12px; border: 0; background: #bbb; cursor: pointer; position: relative; }
+  .switch[aria-checked=true] { background: #0a8a3a; }
+  .tabs [role=tab] { border: 0; background: #eee; padding: 6px 12px; cursor: pointer; }
+  .tabs [role=tab][aria-selected=true] { background: #0a58ca; color: #fff; }
+  .menu { position: relative; display: inline-block; }
+  .menu > span { border: 1px solid #999; padding: 6px 10px; border-radius: 6px; cursor: default; }
+  .menu ul { display: none; position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #aaa; list-style: none; margin: 0; padding: 4px 0; min-width: 140px; z-index: 30; }
+  .menu:hover ul { display: block; }
+  .menu li a { display: block; padding: 6px 10px; color: #111; text-decoration: none; }
+  #lazy { height: 160px; overflow: auto; border: 1px solid #ccc; }
+  #lazy button { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid #eee; background: #fff; padding: 8px; cursor: pointer; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 10px 18px; border-radius: 6px; z-index: 60; }
+  .chatbar { position: fixed; right: 0; bottom: 0; left: 0; height: 90px; background: #ffe9a8; border-top: 2px solid #d9a400; z-index: 40; display: flex; align-items: center; padding: 0 16px; }
+  .ac-list { border: 1px solid #aaa; list-style: none; margin: 0; padding: 0; width: 272px; background: #fff; }
+  .ac-list li { padding: 5px 8px; cursor: pointer; }
+  .seg button { border: 1px solid #0a58ca; background: #fff; color: #0a58ca; padding: 6px 12px; cursor: pointer; }
+  .seg button[aria-pressed=true] { background: #0a58ca; color: #fff; }
+  .card { display: inline-block; border: 2px solid #ccc; border-radius: 8px; padding: 10px 14px; margin-right: 8px; cursor: pointer; }
+  .card[aria-checked=true] { border-color: #0a58ca; }
+  .fakebox { display: inline-block; width: 16px; height: 16px; border: 2px solid #555; border-radius: 3px; vertical-align: middle; cursor: pointer; }
+  .fakebox[aria-checked=true] { background: #0a58ca; }
+  .iconbtn { cursor: pointer; display: inline-block; padding: 4px; }
+</style>
+</head>
+<body>
+<header class="sticky">Acme Workspace — Settings <span style="float:right">Signed in as Test User</span></header>
+<main>
+<h1>Account setup</h1>
+
+<!-- 1. Radix UI Select: opens on pointerdown, content portaled to <body>, hidden native select beside it -->
+<section id="w-radix"><h2>Radix select</h2>
+  <label id="lang-l">Preferred language</label><br>
+  <button type="button" id="lang" class="trigger" role="combobox" aria-labelledby="lang-l" aria-expanded="false" aria-haspopup="listbox" aria-controls="lang-lb" data-state="closed"><span id="lang-v">C++</span> ▾</button>
+  <select aria-hidden="true" tabindex="-1" style="position:absolute;border:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap"><option>C++</option><option>Java</option><option>Python3</option></select>
+</section>
+
+<!-- 2. react-select: opens on mousedown of the control, options are plain divs, filters as you type -->
+<section id="w-rs"><h2>React-Select</h2>
+  <label for="country-in">Country of residence</label>
+  <div class="rs-control" id="country-ctl"><span class="rs-placeholder" id="country-ph">Select...</span><input id="country-in" autocomplete="off" aria-autocomplete="list" aria-expanded="false" role="combobox"></div>
+</section>
+
+<!-- 3. MUI Select: div[role=combobox], menu in a portal over an invisible full-screen backdrop -->
+<section id="w-mui"><h2>MUI select</h2>
+  <label id="level-l">Seniority level</label><br>
+  <div id="level" class="trigger" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="level-l">Choose…</div>
+</section>
+
+<!-- 4. Date picker: read-only input, calendar popup with month navigation and day buttons -->
+<section id="w-date"><h2>Date picker</h2>
+  <label for="start">Start date</label><br>
+  <input id="start" type="text" readonly placeholder="MM/DD/YYYY">
+</section>
+
+<!-- 5. Web component with an open shadow root -->
+<section id="w-shadow"><h2>Shadow DOM</h2><zoo-newsletter></zoo-newsletter></section>
+
+<!-- 6/7. Same-origin and cross-origin iframes -->
+<section id="w-iframe"><h2>Iframes</h2>
+  <iframe id="f1" src="/zoo/frame" title="Coupon" style="width:100%;height:90px;border:1px dashed #aaa"></iframe>
+  <iframe id="f2" title="Payment details" style="width:100%;height:90px;border:1px dashed #aaa"></iframe>
+</section>
+
+<!-- 8. contenteditable message box (LinkedIn / Gmail style) -->
+<section id="w-ce"><h2>Rich text</h2>
+  <div id="msg" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Write a message" style="border:1px solid #999;min-height:50px;padding:6px"></div>
+</section>
+
+<!-- 9. Toggle switch -->
+<section id="w-switch"><h2>Switch</h2>
+  <span id="notif-l">Email notifications</span> <button id="notif" class="switch" role="switch" aria-checked="false" aria-labelledby="notif-l"></button>
+</section>
+
+<!-- 10. Tabs with a field in a hidden panel -->
+<section id="w-tabs" class="tabs"><h2>Tabs</h2>
+  <div role="tablist"><button role="tab" id="t-prof" aria-selected="true" aria-controls="p-prof">Profile</button><button role="tab" id="t-bill" aria-selected="false" aria-controls="p-bill">Billing</button></div>
+  <div role="tabpanel" id="p-prof"><p>Profile details are managed by your admin.</p></div>
+  <div role="tabpanel" id="p-bill" hidden><label for="bemail">Billing email</label> <input id="bemail" type="email"></div>
+</section>
+
+<!-- 11. Accordion -->
+<section id="w-acc"><h2>Accordion</h2>
+  <button id="acc" aria-expanded="false" aria-controls="acc-r" class="trigger">Shipping address ▸</button>
+  <div id="acc-r" role="region" hidden><label for="zip">Postal code</label> <input id="zip" type="text"></div>
+</section>
+
+<!-- 12. CSS :hover-only menu -->
+<section id="w-hover"><h2>Hover menu</h2>
+  <div class="menu"><span>Account ▾</span><ul><li><a href="#profile" data-m="Profile">Profile</a></li><li><a href="#settings" data-m="Settings">Settings</a></li><li><a href="#signout" data-m="Sign out">Sign out</a></li></ul></div>
+</section>
+
+<!-- 13. Infinite list inside its own scroll container -->
+<section id="w-lazy"><h2>Infinite list</h2><div id="lazy" aria-label="Projects"></div></section>
+
+<!-- 14. Slow content -->
+<section id="w-slow"><h2>Slow load</h2><button class="btn" id="load">Generate report</button> <span id="slow-out"></span></section>
+
+<!-- 15. Toast -->
+<section id="w-toast"><h2>Toast</h2><button class="btn" id="draft">Save draft</button></section>
+
+<!-- 16. window.confirm -->
+<section id="w-confirm"><h2>Confirm dialog</h2><button class="btn" id="archive">Archive project</button></section>
+
+<!-- 17. Custom checkbox gating a disabled button -->
+<section id="w-gate"><h2>Terms gate</h2>
+  <span id="terms" class="fakebox" role="checkbox" aria-checked="false" tabindex="0" aria-labelledby="terms-l"></span> <span id="terms-l">I agree to the Terms of Service</span><br><br>
+  <button class="btn" id="accept" disabled>Continue to payment</button>
+</section>
+
+<!-- 18. Button covered by a fixed bottom bar (not a dialog) -->
+<section id="w-covered" style="margin-top:40px"><h2>Covered button</h2><button class="btn" id="publish">Publish changes</button></section>
+
+<!-- 19. jQuery-UI-style autocomplete that filters on keyup, not input -->
+<section id="w-keyup"><h2>Keyup autocomplete</h2>
+  <label for="skill">Primary skill</label><br><input id="skill" type="text" autocomplete="off"><ul id="skill-ac" class="ac-list" hidden></ul>
+</section>
+
+<!-- 20. Input mask that rewrites the value on every input event -->
+<section id="w-mask"><h2>Masked phone</h2><label for="phone">Mobile number</label><br><input id="phone" type="tel" placeholder="(555) 555-5555"></section>
+
+<!-- 21. Range slider -->
+<section id="w-range"><h2>Slider</h2><label for="budget">Monthly budget (%)</label> <input id="budget" type="range" min="0" max="100" value="20"> <output id="budget-o">20</output></section>
+
+<!-- 22. Segmented toggle buttons -->
+<section id="w-seg"><h2>Toggle buttons</h2><span id="wm-l">Work mode</span>
+  <div class="seg" role="group" aria-labelledby="wm-l"><button aria-pressed="false">Remote</button><button aria-pressed="false">Hybrid</button><button aria-pressed="false">Onsite</button></div>
+</section>
+
+<!-- 23. Native select with optgroups and many options -->
+<section id="w-tz"><h2>Timezone</h2><label for="tz">Timezone</label><br><select id="tz"></select></section>
+
+<!-- 24. Controlled input whose element is replaced on every keystroke -->
+<section id="w-rerender"><h2>Re-rendering input</h2><div id="rr-host"></div></section>
+
+<!-- 25. Search that only runs on Enter -->
+<section id="w-enter"><h2>Enter to search</h2><label for="q">Search members</label><br><input id="q" type="search"> <span id="q-out"></span></section>
+
+<!-- 26. Icon-only controls -->
+<section id="w-icon"><h2>Icon buttons</h2>
+  <span class="iconbtn" id="edit-name" onclick="ZOO.edit=true"><svg width="18" height="18" viewBox="0 0 18 18"><title>Edit display name</title><path d="M2 14 L12 4 L14 6 L4 16 Z" fill="#333"/></svg></span>
+  <button aria-label="Delete avatar" id="del-av" style="border:0;background:none;cursor:pointer" onclick="ZOO.avatarDeleted=true"><svg width="18" height="18"><rect x="3" y="3" width="12" height="12" fill="#b00"/></svg></button>
+</section>
+
+<!-- 27. Radio cards -->
+<section id="w-plan"><h2>Plan</h2><span id="plan-l">Plan</span>
+  <div role="radiogroup" aria-labelledby="plan-l"><div class="card" role="radio" aria-checked="true" tabindex="0">Starter — $0</div><div class="card" role="radio" aria-checked="false" tabindex="-1">Team — $12/user</div></div>
+</section>
+</main>
+
+<div class="chatbar" id="chatbar">Need help? Our team is online. <button class="btn" style="margin-left:12px" onclick="ZOO.chat=true">Chat now</button></div>
+
+<script>
+window.ZOO = {};
+const $ = (s, r) => (r || document).querySelector(s);
+function portal(html) { const d = document.createElement("div"); d.innerHTML = html; const el = d.firstElementChild; document.body.appendChild(el); return el; }
+function placeUnder(pop, anchor) { const r = anchor.getBoundingClientRect(); pop.style.left = (r.left + scrollX) + "px"; pop.style.top = (r.bottom + scrollY + 4) + "px"; }
+
+// 1. Radix select
+(function () {
+  const t = $("#lang"); let pop = null;
+  function close() { if (pop) { pop.remove(); pop = null; } t.setAttribute("aria-expanded", "false"); t.dataset.state = "closed"; }
+  function open() {
+    pop = portal('<div data-radix-popper-content-wrapper class="pop"><div role="listbox" id="lang-lb">' +
+      ["C++", "Java", "Python", "Python3", "C", "C#", "JavaScript", "TypeScript"].map(v => '<div role="option" aria-selected="false" data-value="' + v + '">' + v + '</div>').join("") + '</div></div>');
+    placeUnder(pop, t); t.setAttribute("aria-expanded", "true"); t.dataset.state = "open";
+    pop.querySelectorAll("[role=option]").forEach(o => o.addEventListener("pointerup", () => { $("#lang-v").textContent = o.dataset.value; ZOO.lang = o.dataset.value; close(); }));
+  }
+  // Radix toggles on pointerdown and ignores the click that follows.
+  t.addEventListener("pointerdown", e => { if (e.button !== 0) return; e.preventDefault(); pop ? close() : open(); });
+  document.addEventListener("pointerdown", e => { if (pop && !pop.contains(e.target) && !t.contains(e.target)) close(); }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+})();
+
+// 2. react-select
+(function () {
+  const ctl = $("#country-ctl"), inp = $("#country-in"), ph = $("#country-ph"); let menu = null;
+  const ALL = ["Canada", "Cameroon", "Cambodia", "India", "Indonesia", "United States", "United Kingdom", "Germany"];
+  function close() { if (menu) { menu.remove(); menu = null; } inp.setAttribute("aria-expanded", "false"); }
+  function render() {
+    if (!menu) { menu = portal('<div class="pop rs-menu"></div>'); placeUnder(menu, ctl); }
+    const q = inp.value.toLowerCase(); const m = ALL.filter(x => x.toLowerCase().includes(q));
+    menu.innerHTML = m.length ? m.map(x => '<div class="rs-option">' + x + '</div>').join("") : '<div style="padding:6px 10px;color:#888">No options</div>';
+    menu.querySelectorAll(".rs-option").forEach(o => o.addEventListener("click", () => { ZOO.country = o.textContent; ph.textContent = o.textContent; ph.style.color = "#111"; inp.value = ""; close(); inp.blur(); }));
+    inp.setAttribute("aria-expanded", "true");
+  }
+  ctl.addEventListener("mousedown", e => { if (e.target !== inp) e.preventDefault(); inp.focus(); render(); });
+  inp.addEventListener("input", () => { ph.style.display = inp.value ? "none" : ""; render(); });
+  inp.addEventListener("keydown", e => { if (e.key === "Enter" && menu) { const f = menu.querySelector(".rs-option"); if (f) f.click(); e.preventDefault(); } });
+  inp.addEventListener("blur", () => setTimeout(close, 150));
+})();
+
+// 3. MUI select
+(function () {
+  const t = $("#level"); let bd = null, pop = null;
+  function close() { if (bd) bd.remove(); if (pop) pop.remove(); bd = pop = null; t.setAttribute("aria-expanded", "false"); }
+  t.addEventListener("mousedown", e => {
+    if (e.button !== 0) return; e.preventDefault();
+    bd = portal('<div class="backdrop" role="presentation"></div>');
+    pop = portal('<div class="pop" style="z-index:95"><ul role="listbox" style="list-style:none;margin:0;padding:4px 0">' + ["Intern", "Junior", "Mid-level", "Senior", "Staff", "Principal"].map(v => '<li role="option" tabindex="-1">' + v + '</li>').join("") + '</ul></div>');
+    placeUnder(pop, t); t.setAttribute("aria-expanded", "true");
+    bd.addEventListener("click", close);
+    pop.querySelectorAll("li").forEach(li => li.addEventListener("click", () => { t.textContent = li.textContent; ZOO.level = li.textContent; close(); }));
+  });
+})();
+
+// 4. Date picker
+(function () {
+  const inp = $("#start"); let pop = null; const now = new Date(); let y = now.getFullYear(), m = now.getMonth();
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  function close() { if (pop) pop.remove(); pop = null; }
+  function draw() {
+    const days = new Date(y, m + 1, 0).getDate(); const pad = new Date(y, m, 1).getDay();
+    pop.innerHTML = '<div class="cal"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><button aria-label="Previous month" class="pm">‹</button><strong>' + MONTHS[m] + " " + y + '</strong><button aria-label="Next month" class="nm">›</button></div><div class="grid">' +
+      "<span></span>".repeat(pad) + Array.from({ length: days }, (_, i) => '<button aria-label="' + MONTHS[m] + " " + (i + 1) + ", " + y + '">' + (i + 1) + "</button>").join("") + "</div></div>";
+    pop.querySelector(".pm").onclick = () => { m--; if (m < 0) { m = 11; y--; } draw(); };
+    pop.querySelector(".nm").onclick = () => { m++; if (m > 11) { m = 0; y++; } draw(); };
+    pop.querySelectorAll(".grid button").forEach(b => b.onclick = () => { const d = String(b.textContent).padStart(2, "0"); inp.value = String(m + 1).padStart(2, "0") + "/" + d + "/" + y; ZOO.date = y + "-" + String(m + 1).padStart(2, "0") + "-" + d; close(); });
+  }
+  inp.addEventListener("click", () => { if (pop) return; pop = portal('<div class="pop" role="dialog" aria-label="Choose date"></div>'); placeUnder(pop, inp); draw(); });
+  document.addEventListener("mousedown", e => { if (pop && !pop.contains(e.target) && e.target !== inp) close(); });
+})();
+
+// 5. Shadow DOM
+customElements.define("zoo-newsletter", class extends HTMLElement {
+  connectedCallback() {
+    const s = this.attachShadow({ mode: "open" });
+    s.innerHTML = '<label for="nl">Newsletter email</label> <input id="nl" type="email"> <button id="sub" style="cursor:pointer">Subscribe</button>';
+    s.getElementById("sub").addEventListener("click", () => { ZOO.newsletter = s.getElementById("nl").value; });
+  }
+});
+
+// 6/7. Frames. The cross-origin one is served from 127.0.0.1 while this page is on localhost.
+$("#f2").src = (location.hostname === "localhost" ? "http://127.0.0.1:" : "http://localhost:") + location.port + "/zoo/frame2";
+addEventListener("message", e => { if (e.data && e.data.zoo) Object.assign(ZOO, e.data.zoo); });
+
+// 8. contenteditable
+$("#msg").addEventListener("input", e => { ZOO.message = e.target.innerText.trim(); });
+
+// 9. Switch
+$("#notif").addEventListener("click", e => { const on = e.currentTarget.getAttribute("aria-checked") !== "true"; e.currentTarget.setAttribute("aria-checked", String(on)); ZOO.notifications = on; });
+
+// 10. Tabs
+document.querySelectorAll("[role=tab]").forEach(tab => tab.addEventListener("click", () => {
+  document.querySelectorAll("[role=tab]").forEach(t => { t.setAttribute("aria-selected", String(t === tab)); $("#" + t.getAttribute("aria-controls")).hidden = t !== tab; });
+}));
+$("#bemail").addEventListener("input", e => { ZOO.billingEmail = e.target.value; });
+
+// 11. Accordion
+$("#acc").addEventListener("click", e => { const o = e.currentTarget.getAttribute("aria-expanded") !== "true"; e.currentTarget.setAttribute("aria-expanded", String(o)); $("#acc-r").hidden = !o; });
+$("#zip").addEventListener("input", e => { ZOO.zip = e.target.value; });
+
+// 12. Hover menu
+document.querySelectorAll(".menu a").forEach(a => a.addEventListener("click", e => { e.preventDefault(); ZOO.menu = a.dataset.m; }));
+
+// 13. Infinite list: 10 at a time, more when scrolled near the bottom of its own container
+(function () {
+  const box = $("#lazy"); let n = 0;
+  function more() { for (let i = 0; i < 10 && n < 60; i++) { n++; const b = document.createElement("button"); b.textContent = "Project " + n; const k = n; b.onclick = () => { ZOO.project = k; }; box.appendChild(b); } }
+  more(); box.addEventListener("scroll", () => { if (box.scrollTop + box.clientHeight > box.scrollHeight - 30) setTimeout(more, 300); });
+})();
+
+// 14. Slow load
+$("#load").addEventListener("click", () => {
+  $("#slow-out").textContent = "Generating…";
+  setTimeout(() => { $("#slow-out").innerHTML = '<button class="btn" id="dl">Download report.pdf</button>'; $("#dl").onclick = () => { ZOO.downloaded = true; }; }, 3500);
+});
+
+// 15. Toast that disappears
+$("#draft").addEventListener("click", () => { ZOO.drafted = true; const t = portal('<div class="toast" role="status">Draft saved at ' + new Date().toLocaleTimeString() + '</div>'); setTimeout(() => t.remove(), 1800); });
+
+// 16. confirm()
+$("#archive").addEventListener("click", () => { ZOO.archived = confirm("Archive this project? It will be hidden from your team."); });
+
+// 17. Terms gate
+$("#terms").addEventListener("click", e => { const on = e.currentTarget.getAttribute("aria-checked") !== "true"; e.currentTarget.setAttribute("aria-checked", String(on)); $("#accept").disabled = !on; });
+$("#accept").addEventListener("click", () => { ZOO.accepted = true; });
+
+// 18. Covered button
+$("#publish").addEventListener("click", () => { ZOO.published = true; });
+
+// 19. keyup autocomplete
+(function () {
+  const inp = $("#skill"), ul = $("#skill-ac"); const ALL = ["TypeScript", "Terraform", "Tailwind", "Python", "PostgreSQL", "Kubernetes"];
+  inp.addEventListener("keyup", () => {
+    const q = inp.value.toLowerCase(); const m = q ? ALL.filter(x => x.toLowerCase().startsWith(q)) : [];
+    ul.innerHTML = m.map(x => "<li>" + x + "</li>").join(""); ul.hidden = !m.length;
+    ul.querySelectorAll("li").forEach(li => li.addEventListener("click", () => { inp.value = li.textContent; ZOO.skill = li.textContent; ul.hidden = true; }));
+  });
+})();
+
+// 20. Mask
+$("#phone").addEventListener("input", e => {
+  const d = e.target.value.replace(/[^0-9]/g, "").slice(0, 10);
+  e.target.value = d.length > 6 ? "(" + d.slice(0, 3) + ") " + d.slice(3, 6) + "-" + d.slice(6) : d.length > 3 ? "(" + d.slice(0, 3) + ") " + d.slice(3) : d;
+  ZOO.phone = d;
+});
+
+// 21. Range
+$("#budget").addEventListener("input", e => { $("#budget-o").textContent = e.target.value; ZOO.budget = Number(e.target.value); });
+
+// 22. Segmented buttons
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => { document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); ZOO.workMode = b.textContent; }));
+
+// 23. Timezones
+(function () {
+  const groups = { "Americas": ["(GMT-08:00) Pacific Time", "(GMT-05:00) Eastern Time", "(GMT-03:00) Buenos Aires"], "Europe": ["(GMT+00:00) London", "(GMT+01:00) Berlin", "(GMT+03:00) Moscow"], "Asia": ["(GMT+04:00) Dubai", "(GMT+05:30) India Standard Time", "(GMT+05:45) Kathmandu", "(GMT+08:00) Singapore", "(GMT+09:00) Tokyo"] };
+  $("#tz").innerHTML = '<option value="">Select a timezone</option>' + Object.entries(groups).map(([g, l]) => '<optgroup label="' + g + '">' + l.map(x => '<option value="' + x.slice(1, 10) + '">' + x + "</option>").join("") + "</optgroup>").join("");
+  $("#tz").addEventListener("change", e => { ZOO.tz = e.target.selectedOptions[0].textContent; });
+})();
+
+// 24. Re-rendering controlled input: the <input> element is replaced on every keystroke
+(function () {
+  const host = $("#rr-host"); let v = "";
+  function render() {
+    host.innerHTML = '<label for="rr">Company name</label><br><input id="rr" type="text" value="' + v.replace(/"/g, "&quot;") + '">';
+    const i = $("#rr"); i.addEventListener("input", () => { v = i.value; ZOO.company = v; const pos = i.selectionStart; const had = document.activeElement === i; render(); if (had) { const n = $("#rr"); n.focus(); n.setSelectionRange(pos, pos); } });
+  }
+  render();
+})();
+
+// 25. Enter to search
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter") { ZOO.search = e.target.value; $("#q-out").textContent = "3 members match “" + e.target.value + "”"; } });
+
+// 27. Radio cards
+document.querySelectorAll("[role=radio].card").forEach(c => c.addEventListener("click", () => { document.querySelectorAll("[role=radio].card").forEach(x => x.setAttribute("aria-checked", String(x === c))); ZOO.plan = c.textContent; }));
+</script>
+</body>
+</html>

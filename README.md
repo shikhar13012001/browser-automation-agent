@@ -1,6 +1,6 @@
 # Intent Agent
 
-Intent Agent turns a natural-language request into a queued task that a daemon executes in a real Chrome browser. A Next.js dashboard stores tasks in Neon Postgres, the local daemon claims them, and an OpenCode browser agent drives Chrome through the Chrome DevTools MCP server. Each task returns a status, an ordered activity trail, and a final result to the dashboard.
+Intent Agent turns a plain-English request into a queued task that runs in your real, logged-in Chrome. You queue tasks from a Next.js dashboard, which stores them in Neon Postgres. A daemon on your machine claims each task and runs it with an OpenCode agent. The agent drives Chrome through **intent-browser**, a purpose-built MCP server that shows the model a compact semantic tree of the page instead of raw HTML or screenshots. Each task returns a status, an activity trail, its cost and a final result to the dashboard.
 
 ![Intent Agent dashboard](docs/images/dashboard.png)
 
@@ -16,34 +16,37 @@ The animation above is a screen recording, shown at 3x speed, of the agent runni
 
 | Feature | What it does |
 | --- | --- |
-| **Plain-English tasks** | Type what you want done ("search for Applied AI roles and open the top result") and it is queued from the dashboard, including from your phone once deployed. |
+| **Plain-English tasks** | Type what you want done ("apply to this job with my resume", "book 2:30 PM tomorrow") and it is queued from the dashboard, including from your phone once deployed. |
 | **Your real, logged-in Chrome** | Tasks run in a Chrome you already use, so sites that need your sessions and cookies work without handing credentials to a third party. |
-| **Activity trail** | Every run records status, tool actions, findings, and the final answer, and the dashboard shows the trail alongside the result. |
-| **File attachments** | Attach files to a task, and the agent can upload local files (such as a resume) into web forms. |
+| **Semantic page tree** | The model sees only what a user can act on: `[12] combobox "Country" = "India" *`. That is about 1–3k tokens per page instead of a 20–80k accessibility dump. See [How the browser tool works](#how-the-browser-tool-works). |
+| **One call per page** | The model fills a whole form step in one `act` call (every field plus the Next click), so a 3-step application takes about 5 tool calls. |
+| **Works on modern widgets** | Radix/MUI/React-Select dropdowns, date pickers, shadow DOM, cross-origin iframes, rich-text boxes, hover menus, infinite lists and code editors (Monaco, CodeMirror, Ace). There are 28 patterns in a [test fixture](#robustness-test-widget-zoo). |
+| **Vision only when needed** | A `look` tool sends one screenshot to a vision model when the tree can't answer (canvas, image-only UI) and returns coordinates to click. |
+| **Activity trail** | Every run records status, tool actions, findings, and the final answer. While it runs, the dashboard shows the agent's latest step. |
+| **File attachments** | Attach files to a task, and the agent can upload local files (such as a resume) into web forms. Uploads are restricted to allowed folders. |
 | **Follow-up in the same session** | Continue a finished task and the agent keeps its earlier context instead of starting cold. |
 | **Approval gate** | Tick "Ask before the final submit" and the agent does all the preparation, stops one step before the irreversible action, and waits. Approve or reject from the dashboard and it resumes in the same session. |
-| **QA mode** | Point the agent at a product you are allowed to test and it reports findings as structured data (severity, category, URL, repro steps, expected vs actual), shown as a findings list. |
-| **Batch runs from a spreadsheet** | Upload a .csv or .xlsx and a `{{column}}` instruction: one task is queued per row. Rows that repeat an earlier key (for example a company already handled in a previous batch) are skipped. |
+| **QA mode** | Point the agent at a product you are allowed to test and it reports findings as structured data (severity, category, URL, repro steps, expected vs actual). |
+| **Batch runs from a spreadsheet** | Upload a .csv or .xlsx and a `{{column}}` instruction: one task is queued per row. Rows that repeat an earlier key are skipped. |
 | **Task templates** | Save a prompt once and reuse it from a dropdown. |
 | **Structured output** | Describe the JSON you want back and get it parsed and stored with the task. |
-| **Cost and model per run** | Every run records the model used and its token and dollar cost, summed across all steps. |
-| **Model fallback** | Set several models in `INTENT_AGENT_MODEL` and the daemon moves to the next when one fails (quota, auth, network). |
-| **Self-healing** | If the browser tool connection dies, the daemon restarts the agent server and retries once. Tasks interrupted by a daemon restart are marked failed rather than left running. |
-| **Personal context** | Private Markdown files in `context/` (profile, preferences, file locations) are loaded into each new session, so the agent does not need to be told the same things twice. |
-| **Stops when stuck** | On a CAPTCHA, OTP, login challenge, or input it cannot determine, the run ends as `needs_attention`, uploads a screenshot, and can email you. |
+| **Cost and model per run** | Every run records the model used and its fresh, cached and output tokens and dollar cost, summed across all steps. |
+| **Safe for unattended runs** | A stuck run is aborted after 3 minutes without browser progress; long runs that keep working are not cut off. The fallback model continues in the same session without repeating finished steps. The daemon restarts a crashed debug Chrome, and you get an email when a task fails, gets blocked, or the browser is unavailable. See [Unattended runs](#unattended-runs). |
+| **Personal context** | Private Markdown files in `context/` (profile, resume variants, preferences) are loaded into each new session, so the agent does not need to be told the same things twice. |
+| **Stops when stuck** | On a CAPTCHA, OTP, login challenge, or input it cannot determine, the run ends as `needs_attention`, uploads a screenshot, and emails you. |
 | **Consequence policy** | Browsing, reading, and filling in forms are automatic. Submitting, sending, paying, or deleting only happens when your task explicitly asks for it. |
-| **Untrusted-page defense** | Text on web pages is treated as data, never as instructions, which limits prompt-injection from the sites the agent visits. |
+| **Untrusted-page defense** | Text on web pages is treated as data, never as instructions, which limits prompt injection from the sites the agent visits. |
 | **Private by design** | The hosted app only stores tasks and results. Browser control stays on your machine, and access is gated by a shared secret. |
 
 ## Who it is for
 
 | You are... | Typical use |
 | --- | --- |
-| **A job seeker** | Search roles, read postings, and fill application forms with your resume attached, stopping before Submit for your review. |
+| **A job seeker** | Search roles, read postings, and fill application forms with the right resume attached, stopping before Submit for your review. |
 | **A developer or power user** | Delegate repetitive browser chores such as checking a dashboard, collecting details from several pages, or verifying a deployed page. |
 | **Someone away from their computer** | Queue a task from your phone and let your home or work machine do it. |
-| **A SaaS founder, product manager, or QA engineer** | Test your product the way a new user meets it: start from a search, land on your site, sign up, and use it. Ask the agent to report confusing steps, dead ends, broken flows, and errors it runs into. |
-| **An automation tinkerer** | Extend an agent with your own context files, models, and prompts. |
+| **A SaaS founder, product manager, or QA engineer** | Test your product the way a new user meets it: start from a search, land on your site, sign up, and use it. Run many personas as a batch in QA mode and get their findings back as structured data. |
+| **An automation tinkerer** | Extend the agent with your own context files, models, and prompts, or reuse `packages/browser-mcp` in any MCP client. |
 
 It is built for one person driving one machine, not for teams.
 
@@ -51,29 +54,20 @@ It is built for one person driving one machine, not for teams.
 
 Use Intent Agent when:
 
-- The task is a short, multi-step web workflow that a person would do in a browser: search, open, read, fill, upload.
+- The task is a multi-step web workflow that a person would do in a browser: search, open, read, fill, upload.
 - The site requires you to be logged in, or blocks headless scrapers.
-- You want a fresh-eyes usability pass on a product you own or are authorised to test, for example "search for a tool that does X, find our site, try to create a project, and list every point where you got confused or something broke".
+- You want a fresh-eyes usability pass on a product you own or are authorised to test.
 - You want a record of what the agent did and the ability to step in when it is stuck.
 - You are fine with the agent working on your machine while it is on and awake.
 
 Reach for something else when:
 
-- You need high-volume or scheduled scraping. Tasks run one at a time, so a purpose-built scraper or API will be faster and cheaper.
+- You need high-volume or scheduled scraping. Tasks run one at a time per machine, so a purpose-built scraper or API will be faster and cheaper.
 - A site offers an official API. An API is more reliable than driving a page.
 - The action is irreversible and you have not reviewed it. The agent is designed to stop short, but you should still read what it did.
 - Several people need separate accounts and permissions. Access is a single shared secret.
 - You need repeatable regression testing. Exploratory runs are not deterministic, so keep a scripted end-to-end suite for release gates and use this to find what the scripts do not cover.
 - The site's terms forbid automation. Check them before pointing the agent at it.
-
-## Current limitations
-
-- QA findings are the model's observations, and a research study of AI web-testing agents reported many false positives. Reproduce each finding before filing it.
-- One task runs at a time on a device. A batch queues one task per row and works through them in order.
-- The activity trail (every tool call and reasoning step) is assembled after the model responds, with a 15-second heartbeat while it works, rather than streamed step by step.
-- The agent's own screenshot call can time out on long-lived browser sessions; restarting the daemon clears it.
-- Setup scripts assume Windows and a dedicated Chrome debug profile.
-- There is no automated test suite yet.
 
 ## How it works
 
@@ -83,51 +77,170 @@ flowchart LR
   D[Local daemon] -->|poll and claim| DB
   D --> SDK[OpenCode SDK]
   SDK --> A[Browser agent]
-  A --> MCP[Chrome DevTools MCP]
-  MCP --> C[Debug Chrome]
+  A --> MCP[intent-browser MCP]
+  MCP -->|CDP via puppeteer-core| C[Debug Chrome]
   D -->|events and result| DB
   DB -->|poll updates| U
 ```
 
-The cloud-facing web app never controls the browser directly. Browser access stays on the machine running the daemon and its debug Chrome instance.
+1. You submit a task in the dashboard. It is stored as `queued`.
+2. The daemon polls `/api/tasks/next`, which claims one task atomically (`FOR UPDATE SKIP LOCKED`), so several daemons never take the same task.
+3. The daemon starts an OpenCode session with the `browser` agent (prompt and tools in `opencode.jsonc`), prepends your `context/` files, and sends the task.
+4. The agent calls intent-browser tools: `open`, `state`, `act`, `tabs`, `look`. The MCP server talks to Chrome over the DevTools Protocol on port 9222.
+5. The daemon reads the whole turn back (every tool call and reasoning step, plus token usage and cost), classifies the ending, and reports it. The ending is one of: completed, `NEEDS_ATTENTION:`, awaiting approval, or failed.
 
-## Browser automation proof
+The web app never controls the browser. Browser access stays on the machine running the daemon.
 
-The following end-to-end check was run on September 28, 2026 through the real task queue and daemon:
+## How the browser tool works
+
+`packages/browser-mcp` is the part that decides speed, cost and reliability. General-purpose browser MCP servers send the model the full accessibility tree or a screenshot on every step. That is tens of thousands of tokens, and it gives no help with custom widgets. intent-browser does three things instead.
+
+### 1. A semantic tree, not the DOM
+
+An in-page script ([extract-src.ts](packages/browser-mcp/src/extract-src.ts)) walks the DOM, including shadow roots and every frame. It keeps only the elements a user can act on and prints each on one line:
 
 ```text
-Open https://example.com in the attached Chrome browser.
-Verify the title is exactly "Example Domain" and the final URL is
-https://example.com/. Take a screenshot after verification.
+PAGE "Application form | Northwind Careers" http://localhost:4545/apply/sde1/form
+ERRORS: "Please fix 2 field(s) below."
+## Personal details
+[1] textbox "First name" * = "Shikhar"
+[2] textbox:email "Email address" * = "" (INVALID: Email address is required)
+[3] select "Country code" * = "Select…" options: +1 United States | +44 United Kingdom | +91 India …
+[4] combobox "City" * = ""
+[5] file "Resume" * = "" (hidden input: use upload)
+? "Are you currently based in India?"
+  [6] radio "Yes" ( )
+  [7] radio "No" ( )
+[8] button "Next"
+(44 header/nav/footer links hidden; call state with all=true only if you need them)
 ```
 
-The task reached `completed` and returned:
+- **Labels are resolved the way a person reads them:** `aria-labelledby`, `aria-label`, `<label for>`, a wrapping label (without the text of controls inside it), placeholder, or nearby text. A trailing `*` counts as required.
+- **Values and state are shown inline:** current value, checked/selected, disabled, read-only, `aria-invalid` with its error text, and open popups.
+- **What is blocking comes first:** a modal dialog hides everything behind it until it closes, so the model can't click through it. Open dropdowns and popovers are listed first. `role=alert` text appears as ERRORS, and toasts and `role=status` text appear as MESSAGES.
+- **Clickable divs are detected:** React/Vue elements with no role are found by their pointer cursor, taking the outermost element that has it. CSS hover-only menus are detected too.
+- **Clutter is collapsed:** header, nav and footer links are hidden unless asked for. Code editors appear as one `code` item.
+- **Ids stay stable:** an element keeps its id for as long as it exists. Each document has a generation token, so a stale id from a previous page is refused instead of hitting a different element. Iframe ids are offset (100001, 200001, …).
 
-```text
-Title: "Example Domain"
-Final URL: https://example.com/
-```
+### 2. Batched, verified actions
 
-![Chrome opened and verified Example Domain](docs/images/browser-automation-proof.png)
+`act` takes a list of `{do, id, value}` actions and returns the new state, so one call fills a whole page. An action can target `label` instead of `id`. It is resolved on the live page when it runs, so fields that only appear after an earlier click (a tab, an accordion, a menu, the next step of a form) can be handled in the same call. Clicks by label need an exact, unique match; ambiguity is an error, never a guess. The verbs are: `click`, `fill`, `select`, `check`, `uncheck`, `upload`, `press`, `scroll`, `wait_for`, `wait`, `open`, `back`, plus two fallbacks, `click_text` and `click_at`. Each verb knows how real sites behave:
 
-The screenshot was captured from the same debug Chrome instance over the Chrome DevTools Protocol; it is not a mockup. The agent's own `take_screenshot` call timed out during this session, so the image was taken directly rather than by the agent.
+- **fill** types the text as one trusted input event and sends the last character as a real key press, so keyup-filtered autocompletes and input masks see it. It then reads the value back. Date, time and range inputs are set natively. On a read-only date field, `fill` with `YYYY-MM-DD` drives the calendar popup itself: it opens the popup, pages to the right month and clicks the day. Code editors are filled through their own API (Monaco `executeEdits`, CodeMirror `setValue`/`dispatch`, Ace), so auto-indent can't corrupt the code.
+- **select** handles native selects (and waits up to 6s for options that load late) and custom dropdowns: open, type to filter if it's an input, pick the closest option by label, value, time ("2 PM" = "14:00") or words. It works on Radix (opens on `pointerdown`), MUI (portal plus backdrop) and React-Select (options are plain divs).
+- **click** first checks what is under the element's centre. If a sticky header, chat widget or banner covers it, it tries other scroll positions, then reports what covers it. It never clicks an ad by accident. A hidden styled checkbox is clicked through its label.
+- **Type guards** refuse nonsense such as `select` on a button or `fill` on a checkbox, and say what the element actually is.
+- **Batch safety:** after any click, the page is re-read. If a dialog opened, the page navigated, or an element a later action targets changed, the rest of the batch is skipped and the model re-plans with fresh ids. A stale or briefly covered element is retried once, but only when exactly one element with the same kind and label exists.
+- **Settling:** after a click, it waits for `readyState`, network idle and a quiet DOM, then re-checks for client-side redirects, for example after a saved-login check.
+- **Tabs and dialogs:** `target=_blank` tabs are followed. The tool returns to the opener when a sign-in popup closes. `alert`/`confirm` dialogs are accepted and reported as notes.
+- **Loop guards:** the third identical batch is refused, and the agent has a 60-step cap.
+
+### 3. A fallback ladder instead of retries
+
+When an action doesn't work, the agent prompt tells the model to climb this ladder instead of repeating it:
+
+1. **state** again, because ids may have changed.
+2. **`click_text`** with the visible wording, for elements the tree missed.
+3. **`look`**: ask a vision model a specific question and `click_at` the x,y it returns.
+4. **`NEEDS_ATTENTION`**: stop and ask the user.
+
+`look` exists because OpenCode drops image tool results in this environment. The tool therefore makes the vision call itself (OpenAI Responses API, `gpt-6-luna` by default) and returns text plus coordinates in CSS pixels.
+
+## Benchmarks
+
+All numbers below come from the scripts in `bench/`, run through the daemon's own code path against local fixture sites. No real accounts or submissions are involved.
+
+### Model and tool comparison (job application)
+
+`bench/run.ts` runs one realistic application journey: cookie dialog, Apply opens a new tab, guest sign-in, then a 3-step form with a custom combobox, hidden file input, styled checkboxes and validation, then submit. It scores the 18 fields the fixture server actually received.
+
+| Config | Result | Time | Tool calls | Cost |
+| --- | --- | --- | --- | --- |
+| **intent-browser + gpt-6-luna (low)** | **18/18, submitted** | **42–75s** | 9–15 | **$0.002–0.004** |
+| intent-browser + gpt-6-luna (none / medium) | 18/18, submitted | 58–63s | 9–11 | $0.002–0.003 |
+| intent-browser + gpt-5.4-mini | 18/18, submitted | 88s | 17 | $0.030 |
+| intent-browser + gpt-4o-mini | not submitted | 276s (hit the step cap) | 59 | $0.078 |
+| intent-browser + gpt-4.1-mini / gpt-5-mini / gpt-5.4-nano | not submitted | 57–83s | 11–15 | $0.008–0.016 |
+| chrome-devtools-mcp + gpt-4o-mini (previous tool) | not submitted | 92s | 14 | $0.013 |
+
+`gpt-6-luna` is the default: it is the only model that finished every run, and it is also among the cheapest. Reasoning effort made no measurable difference.
+
+### Speed work (complex task)
+
+`bench/zoo-agent.ts` gives the agent one natural-language task covering about 20 awkward widgets on one page: portaled dropdowns, a calendar, iframes, a hover menu, an infinite list, slow content and more. It is scored on 25 checks, including two actions it must *not* take.
+
+| Change | Time | Tool calls | Cost |
+| --- | --- | --- | --- |
+| Starting point | 215–344s | 28–45 | $0.011–0.020 |
+| React-Select value shown in the state; `click_text` scrolls lazy lists; "trust the state" prompt | 111–122s | 13–16 | $0.005 |
+| Label-targeted actions (reveal and fill in one call); calendar driven by `fill`; `click_text` matches `aria-label` | **68–91s** | **6–9** | **$0.003** |
+
+All runs scored 25/25. What the traces showed:
+
+- **Model steps dominate.** Each model step takes about 3–5s, while browser work for the whole task is under 25s. The changes above cut the steps, mostly by removing retries caused by the tool under-reporting what had worked.
+- **Covered Chrome windows stall every action.** When another app covers Chrome, Chrome stops rendering the page (`visibilityState: hidden`, no `requestAnimationFrame`). Puppeteer's `click()` waits on an IntersectionObserver, so every click hung until the 60s CDP timeout. intent-browser now enables focus emulation on every tab it works in, and Chrome is launched with the anti-throttling flags.
+- **Extensions cost about 1.5s per navigation.** With a copied everyday profile (about 30 extensions), the median navigation took 1,602ms, against 87–145ms without extensions. The launcher now uses `--disable-extensions`; logins still work because they live in cookies.
+- **Waiting for "network idle" was waiting on analytics.** Settling now only counts document, XHR/fetch, script and stylesheet requests, and ignores anything open longer than 1.5s.
+
+### Robustness test (widget zoo)
+
+`bench/zoo-test.ts` drives 28 widget patterns through the tool layer with no model, so a failure is always a tool bug. It currently passes 28/28 in about 40s. The patterns include:
+
+- Radix, MUI and React-Select dropdowns
+- a read-only date picker
+- shadow DOM, plus same-origin and cross-origin iframes
+- contenteditable, a switch, tabs and an accordion
+- a CSS hover menu and an infinite list
+- slow content, a toast and `confirm()`
+- a disabled-until-checked button and a button under a fixed bar
+- a keyup-filtered autocomplete, an input mask and a range slider
+- toggle buttons, optgroups, an input re-rendered on every keystroke, Enter-to-search, icon-only buttons and radio cards
+
+### Real sites
+
+- LeetCode Two Sum: the agent opened the problem, switched the Monaco editor to Python3, wrote a solution and submitted it. It was accepted (65/65 test cases) in 78s for $0.0025.
+- ScheduRx: it booked the nearest free slot with a named doctor in a logged-in session, in 140s for $0.0044.
+
+### Persona QA demo
+
+`bench/qa-run.ts` runs one QA-mode task per persona in `bench/qa/personas.csv` against a copy of the practice site with eight planted bugs (`/qa/...`, listed in `bench/qa/bugs.json`). It reports which planted bugs each persona found, and lists the findings that match none of them as possible false positives. It then merges everything into the same report the dashboard shows for a QA batch (**Batch runs → QA mode → Report**, `GET /api/batches/:id/report`).
+
+## Unattended runs
+
+The daemon is built to be left alone with a queue:
+
+| Situation | What happens |
+| --- | --- |
+| Model or provider hangs (no browser activity) | Every intent-browser call writes a timestamp to `%TEMP%/intent-browser/activity.json`. After `INTENT_AGENT_STALL_MS` (default 3 min) with no activity, the session is aborted for real (`session.abort`), so it can't keep clicking in the background. |
+| A long application that keeps making progress | Not interrupted. The only overall cap is `INTENT_AGENT_MAX_RUN_MS` (default 25 min). |
+| A model fails or stalls | The next model in `INTENT_AGENT_MODEL` continues in the same session. It is told to re-read the page and not to repeat anything irreversible (a submit, a sent message, a booking). |
+| The browser tool connection dies | The OpenCode server is restarted and the task continues once. |
+| Debug Chrome was closed or crashed | Before claiming a task, the daemon checks port 9222. It restarts Chrome with `INTENT_AGENT_CHROME_PROFILE` (a separate instance; your everyday Chrome is untouched). If that fails, tasks stay queued and you get one email. |
+| A task fails | It is marked `failed` with the reason, and you get an email. |
+| A task is blocked (CAPTCHA, OTP, unknown answer) | `needs_attention`, with a screenshot on the dashboard and in the email. |
+| The daemon itself restarts mid-task | The orphaned task is marked failed on startup, so it can be continued or re-run. |
+
+Emails need the `SMTP_*` variables. Without them, the events are only logged.
 
 ## Repository structure
 
 | Path | Purpose |
 | --- | --- |
-| `apps/web` | Next.js dashboard, task APIs, authentication proxy, and upload endpoint |
-| `apps/daemon` | Local task poller, OpenCode session runner, event reporting, and optional email alerts |
+| `apps/web` | Next.js dashboard, task/batch/template APIs, authentication proxy, and upload endpoint |
+| `apps/daemon` | Task poller, OpenCode session runner with watchdog and model fallback, Chrome auto-start, event reporting, email alerts |
+| `packages/browser-mcp` | The intent-browser MCP server: semantic tree extraction, actions, vision fallback |
 | `packages/protocol` | Shared task request/result types |
+| `bench` | Practice job site and widget-zoo fixtures, benchmark matrix, deterministic and agent robustness tests |
 | `context` | Private Markdown context loaded into new agent sessions; ignored by Git except for its guide |
-| `scripts/start-debug-chrome.ps1` | Starts Chrome with remote debugging on port `9222` |
-| `opencode.jsonc` | Browser-agent prompt, model choice, and Chrome DevTools MCP configuration |
+| `scripts/start-debug-chrome.ps1` | Starts Chrome with remote debugging on port `9222` using a copied profile |
+| `opencode.jsonc` | Browser-agent prompt, step limit, model options and MCP server configuration |
 
 ## Prerequisites
 
 - Node.js 20 or newer and npm
 - Google Chrome
-- An OpenCode installation with access to the model configured in `INTENT_AGENT_MODEL`
+- The OpenCode CLI (`npm install -g opencode-ai`); the daemon's SDK starts `opencode serve` itself
+- An API key for your model, for example `OPENAI_API_KEY`
 - A Neon/Postgres database
 - Vercel Blob credentials only when file attachments are required
 - SMTP credentials only when email alerts are required
@@ -142,7 +255,7 @@ npm install
 
 ### Web app
 
-Create `apps/web/.env.local` with the values needed by the dashboard:
+Create `apps/web/.env.local`:
 
 ```dotenv
 DATABASE_URL=postgresql://...
@@ -156,24 +269,32 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_token_if_uploads_are_enabled
 | `DASHBOARD_SECRET` | For public deployments | Protects dashboard pages and APIs with a login cookie or bearer token; auth is disabled when unset |
 | `BLOB_READ_WRITE_TOKEN` | For attachments | Lets `/api/uploads` store files in Vercel Blob |
 
-The app creates missing tables, columns and indexes on first use, including migrating older `run_events` tables that lack the `seq` column or an `id` default.
+The app creates missing tables, columns and indexes on first use.
 
 ### Daemon
 
-The daemon reads configuration from its process environment:
+Copy `apps/daemon/.env.example` to `apps/daemon/.env` (git-ignored); the daemon loads it at startup. Variables already set in the shell take precedence.
 
 | Variable | Default | Description |
 | --- | --- | --- |
 | `CLOUD_API_URL` | `http://localhost:3000` | Dashboard/API origin to poll |
 | `DASHBOARD_SECRET` | unset | Must match the web app when authentication is enabled |
 | `DEVICE_ID` | `laptop-1` | Name shown by the dashboard device badge |
+| `INTENT_AGENT_MODEL` | see `.env.example` | OpenCode `provider/model`, or a comma-separated fallback chain such as `openai/gpt-6-luna,openai/gpt-4o-mini` |
+| `OPENAI_API_KEY` | unset | For OpenAI models and the `look` vision tool |
+| `INTENT_AGENT_STALL_MS` | `180000` | Abort a run after this long with no browser activity |
+| `INTENT_AGENT_MAX_RUN_MS` | `1500000` | Hard cap for one run |
+| `INTENT_AGENT_CHROME_PROFILE` | unset | Profile the daemon uses to restart debug Chrome; unset disables auto-start |
+| `INTENT_AGENT_CHROME_PATH` | auto-detected | Chrome executable |
+| `INTENT_BROWSER_CDP_URL` | `http://127.0.0.1:9222` | Chrome DevTools endpoint |
+| `INTENT_BROWSER_ALLOWED_DIRS` | repo root | Folders `upload` may read files from (`;`-separated on Windows, `:` elsewhere) |
+| `INTENT_BROWSER_VISION_MODEL` | `gpt-6-luna` | Model used by `look` |
 | `POLL_INTERVAL_MS` | `3000` | Delay between queue polls |
-| `INTENT_AGENT_PROJECT_DIR` | current directory | Working directory exposed to the OpenCode session |
-| `INTENT_AGENT_CONTEXT_DIR` | `<project>/context` | Directory containing private Markdown context |
-| `INTENT_AGENT_MODEL` | `github-copilot/claude-sonnet-5` | OpenCode provider/model pair, or a comma-separated fallback chain such as `github-copilot/claude-sonnet-5,ollama-cloud/nemotron-3-super` |
-| `PORT` | `3333` | Port for the daemon's direct `POST /tasks` endpoint |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | unset | Optional SMTP transport for attention alerts |
-| `NOTIFY_EMAIL` | `SMTP_USER` | Optional alert recipient |
+| `INTENT_AGENT_CONTEXT_DIR` | `<repo>/context` | Directory containing private Markdown context |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | unset | SMTP transport for alerts |
+| `NOTIFY_EMAIL` | `SMTP_USER` | Alert recipient |
+
+Model options (for example `reasoningEffort` for `gpt-6-luna`) live under `provider` in `opencode.jsonc`.
 
 ## Run locally
 
@@ -183,28 +304,39 @@ The daemon reads configuration from its process environment:
    npm run dev -w apps/web
    ```
 
-2. Start a Chrome instance that exposes the DevTools port expected by `opencode.jsonc`:
+2. Start a Chrome instance with the DevTools port:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\scripts\start-debug-chrome.ps1
    ```
 
-   The included script stops existing Chrome processes and opens the copied profile at `D:\claude-work\chrome-debug-profile`. Close or save work in other Chrome windows first. For an isolated setup, launch Chrome manually with port `9222` and a dedicated non-default `--user-data-dir` instead.
+   The script stops existing Chrome processes and opens the copied profile at `D:\claude-work\chrome-debug-profile`, so save work in other Chrome windows first. Chrome refuses remote debugging on its default profile, so a copy is needed to keep your logins. Once `INTENT_AGENT_CHROME_PROFILE` is set, the daemon starts this Chrome by itself when it isn't running.
 
-3. Start the daemon in another PowerShell window:
+3. Start the daemon:
 
    ```powershell
-   $env:CLOUD_API_URL = "http://localhost:3000"
-   $env:DASHBOARD_SECRET = "the-same-value-used-by-the-web-app"
-   $env:INTENT_AGENT_PROJECT_DIR = (Get-Location).Path
    npm run start -w apps/daemon
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000), sign in when `DASHBOARD_SECRET` is set, and submit a task. The device badge should show `laptop-1` while the daemon is polling.
+   To run the daemon against the hosted dashboard instead, set `CLOUD_API_URL` to its URL and `DASHBOARD_SECRET` to its secret. The daemon only makes outbound requests, so nothing on your machine needs to be exposed.
+
+4. Open [http://localhost:3000](http://localhost:3000), sign in when `DASHBOARD_SECRET` is set, and submit a task. The device badge shows the daemon's `DEVICE_ID` while it is polling.
+
+To try one task without the dashboard, run it through the same code path the daemon uses:
+
+```powershell
+npx tsx bench/task.ts "Open https://leetcode.com/problems/two-sum/ and tell me the problem's difficulty"
+```
+
+### Using intent-browser in another MCP client
+
+The browser tool is a standalone stdio MCP server:
+
+```json
+{ "command": "npx", "args": ["tsx", "packages/browser-mcp/src/index.ts"], "env": { "INTENT_BROWSER_CDP_URL": "http://127.0.0.1:9222" } }
+```
 
 ## Task lifecycle
-
-Tasks move through these states:
 
 ```text
 queued -> running -> completed
@@ -213,28 +345,41 @@ queued -> running -> completed
                   -> awaiting_approval
 ```
 
-`awaiting_approval` means the agent prepared a final action and is waiting for you to approve or reject it.
+`awaiting_approval` means the agent prepared a final action and is waiting for you to approve or reject it. `needs_attention` is reserved for blockers such as CAPTCHA, OTP, login challenges, or missing user input; the daemon uploads the latest screenshot and sends an email. While a task runs, the daemon posts a status every 15 seconds with the agent's latest step. The full ordered trail of tool calls and reasoning is attached when the run ends, because OpenCode only exposes a message's parts once it is committed.
 
-`needs_attention` is reserved for blockers such as CAPTCHA, OTP, login challenges, or missing user input. When configured, the daemon uploads the latest Chrome screenshot and sends an email alert. OpenCode output becomes available after a response is committed, so the daemon emits a lightweight heartbeat every 15 seconds while longer requests are in flight.
+## Current limitations
+
+- QA findings are the model's observations, and research on AI web-testing agents reports many false positives. Reproduce each finding before filing it.
+- One task runs at a time per machine. A batch queues one task per row; more machines running the daemon work through a queue in parallel.
+- Canvas-only UIs and image CAPTCHAs are beyond the semantic tree. The `look` fallback helps with the former; the latter end as `needs_attention` by design.
+- Closed shadow roots are invisible to page scripts, so elements inside them can only be reached through `look` and `click_at`.
+- Setup scripts assume Windows and a dedicated Chrome debug profile.
 
 ## Safety
 
 - Browser page content is untrusted data, not agent instruction authority.
 - The browser agent stops before consequential actions unless the task explicitly requests them.
+- `upload` only reads files inside `INTENT_BROWSER_ALLOWED_DIRS`.
 - Keep the remote-debugging Chrome profile separate from a daily browsing profile.
-- Never commit `.env.local`, personal files under `context`, resumes, uploaded files, or credentials.
+- Never commit `.env` files, personal files under `context`, resumes, uploaded files, or credentials.
 - Set `DASHBOARD_SECRET` before exposing the web app outside local development.
 
 ## Verification
 
-Run the current quality gates from the repository root:
+From the repository root:
 
 ```powershell
-npm run lint -w apps/web
-npm run build -w apps/web
-npx tsc -p apps/daemon/tsconfig.json --noEmit
-npm test -w apps/daemon
+npm test -w @intent-agent/browser-mcp        # state formatting, option matching, action parsing, upload sandbox
+npm test -w apps/daemon                      # marker parsing, prompt building, model fallback chain
 node --import tsx --test apps/web/src/lib/batch.test.ts
+npx tsc -p apps/daemon/tsconfig.json --noEmit
+npm run lint -w apps/web; npm run build -w apps/web
 ```
 
-Unit tests cover the daemon's marker parsing, prompt building and model fallback chain, and the web app's CSV, template and duplicate-detection logic. Browser behaviour is verified by running end-to-end tasks against the live daemon.
+Browser tests need the fixture server (`node bench/fixture/server.mjs`) and debug Chrome on port 9222:
+
+```powershell
+npx tsx bench/zoo-test.ts                    # 28 widget patterns through the tool layer, no model
+npx tsx bench/zoo-agent.ts openai/gpt-6-luna # one natural-language task across the zoo, scored
+npx tsx bench/run.ts --only luna-low         # job-application benchmark (see Benchmarks)
+```

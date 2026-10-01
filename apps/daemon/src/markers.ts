@@ -47,7 +47,7 @@ Finish with one fenced json block of this exact shape (an empty findings array i
 {"summary": "one or two sentences", "findings": [{"severity": "critical|major|minor|suggestion", "category": "bug|ux|accessibility|content|performance", "title": "short title", "url": "page url", "steps": ["step 1", "step 2"], "expected": "what you expected", "actual": "what happened"}]}
 \`\`\``;
 
-const APPROVAL_INSTRUCTIONS = `APPROVAL GATE: do all preparation work, but do NOT perform the final irreversible action (submitting, sending, paying, deleting, confirming). When you are one step away from it, call take_screenshot once, then stop and end your response with a final line starting exactly with \`NEEDS_APPROVAL:\` followed by a concise description of exactly what you are about to do and what state the page is in. Do not click the final button.`;
+const APPROVAL_INSTRUCTIONS = `APPROVAL GATE: do all preparation work, but do NOT perform the final irreversible action (submitting, sending, paying, deleting, confirming). When you are one step away from it, stop and end your response with a final line starting exactly with \`NEEDS_APPROVAL:\` followed by a concise description of exactly what you are about to do and what state the page is in. Do not click the final button.`;
 
 export function buildPrompt(prompt: string, options: TaskOptions = {}): string {
   const parts: string[] = [];

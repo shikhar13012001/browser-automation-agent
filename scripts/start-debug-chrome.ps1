@@ -14,4 +14,11 @@ Start-Sleep -Seconds 2
 
 & "C:\Program Files\Google\Chrome\Application\chrome.exe" `
   --remote-debugging-port=9222 `
-  --user-data-dir="D:\claude-work\chrome-debug-profile"
+  --user-data-dir="D:\claude-work\chrome-debug-profile" `
+  --disable-backgrounding-occluded-windows `
+  --disable-renderer-backgrounding `
+  --disable-background-timer-throttling `
+  --disable-extensions
+# --disable-extensions: extension content scripts made every navigation ~18x slower (1.6s vs 90ms)
+# with the copied everyday profile. Logins are cookies and still work. Drop the flag if the agent
+# needs an extension (e.g. a password manager).

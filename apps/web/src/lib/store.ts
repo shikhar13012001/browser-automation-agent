@@ -283,6 +283,13 @@ export async function createBatch(input: {
   return rows[0].id as string;
 }
 
+export async function listBatchTasks(batchId: string): Promise<StoredTask[]> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = (await sql`SELECT * FROM tasks WHERE batch_id = ${batchId} ORDER BY created_at ASC`) as Row[];
+  return rows.map(rowToTask);
+}
+
 export async function listBatches(): Promise<Batch[]> {
   await ensureSchema();
   const sql = getSql();

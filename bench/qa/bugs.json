@@ -1,0 +1,10 @@
+[
+  { "id": "B1", "title": "Valid plus-addressed emails are rejected", "personas": ["Plus-address user"], "match": "(\\+|plus).*(email|address)|valid email" },
+  { "id": "B2", "title": "Next does nothing on step 2 when experience is 6+ years", "personas": ["Senior engineer"], "match": "6\\+|(next|continue).*(nothing|no (response|effect|error)|unresponsive|does ?n.t|did ?n.t|not (advance|proceed|work))|stuck" },
+  { "id": "B3", "title": "Long last names are truncated to 20 characters", "personas": ["Long surname"], "match": "truncat|cut off|shortened|venkataraghavan-subr(?!amaniam)" },
+  { "id": "B4", "title": "Going Back from step 2 clears the City field", "personas": ["Double-checker"], "match": "city.*(clear|lost|reset|empty|blank|gone|missing)|(clear|lost|reset|empt).*city" },
+  { "id": "B5", "title": "Missing phone number shows 'Email address is required'", "personas": ["In a hurry"], "match": "phone.*email address is required|email address is required.*phone|(wrong|incorrect|mislead|misleading).*(error|message|label)" },
+  { "id": "B6", "title": "Privacy policy link is a 404", "personas": ["Careful fresher"], "match": "privacy.*(404|not found|broken|dead|error)|(404|not found).*privacy" },
+  { "id": "B7", "title": "Confirmation greets the applicant by last name", "personas": ["*"], "match": "(thank you|greet|confirmation).*(last name|surname|wrong name|family name)|(last name|surname).*(instead|in place) of.*first" },
+  { "id": "B8", "title": "Country code list has no +34 Spain", "personas": ["Applying from Spain"], "match": "\\+34|spain" }
+]

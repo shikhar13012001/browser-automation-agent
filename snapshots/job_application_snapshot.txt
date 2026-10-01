@@ -1,0 +1,581 @@
+uid=7_0 RootWebArea "SDE-1 (FTC) - Job ID: 10525636 | Amazon.jobs" url="https://amazon.jobs/en/jobs/10525636/sde-1-ftc"
+  uid=7_1 ignored
+    uid=7_2 generic
+      uid=7_3 link "Skip to main content" url="https://amazon.jobs/en/jobs/10525636/sde-1-ftc#main-1790677453"
+        uid=7_4 StaticText "Skip to main content"
+          uid=7_5 InlineTextBox "Skip to main content"
+      uid=7_6 ignored
+      uid=7_7 generic
+        uid=7_8 generic
+          uid=7_9 ignored
+            uid=7_10 ignored
+              uid=7_11 ignored
+                uid=7_12 navigation
+                  uid=7_13 generic
+                    uid=7_14 button "menu"
+                      uid=7_15 generic
+                    uid=7_16 link "Amazon Jobs home page" url="https://amazon.jobs/en"
+                      uid=7_17 generic
+                        uid=7_18 generic
+                          uid=7_19 StaticText "Amazon Jobs home page"
+                            uid=7_5 InlineTextBox "Amazon Jobs home page"
+                  uid=7_20 generic
+                    uid=7_21 generic
+                      uid=7_22 form
+                        uid=7_23 generic
+                          uid=7_24 generic
+                            uid=7_25 generic
+                              uid=7_26 ignored
+                                uid=7_27 ignored
+                              uid=7_28 generic
+                                uid=7_29 combobox "Search for jobs by title or keyword" autocomplete="list" expandable haspopup="listbox"
+                                  uid=7_30 ignored
+                                  uid=7_31 generic
+                          uid=7_32 generic
+                            uid=7_33 generic
+                              uid=7_34 generic
+                                uid=7_5 StaticText "h"
+                                  uid=7_5 InlineTextBox "h"
+                              uid=7_35 ignored
+                                uid=7_36 ignored
+                              uid=7_37 generic
+                                uid=7_38 combobox "search job by location" autocomplete="list" expandable haspopup="listbox"
+                                  uid=7_39 ignored
+                                  uid=7_40 generic
+                            uid=7_41 ignored
+                            uid=7_42 ignored
+                            uid=7_43 ignored
+                            uid=7_44 ignored
+                            uid=7_45 ignored
+                            uid=7_46 ignored
+                            uid=7_47 ignored
+                            uid=7_48 ignored
+                        uid=7_49 button "Search jobs"
+                          uid=7_50 ignored
+                  uid=7_51 ignored
+                    uid=7_52 generic
+                      uid=7_53 menu haspopup="menu" orientation="vertical"
+                        uid=7_54 StaticText "My career"
+                          uid=7_5 InlineTextBox "My career"
+                        uid=7_55 generic
+                uid=7_56 ignored
+          uid=7_57 ignored
+            uid=7_58 ignored
+              uid=7_59 ignored
+            uid=7_60 ignored
+              uid=7_61 ignored
+              uid=7_62 ignored
+            uid=7_63 ignored
+              uid=7_64 ignored
+            uid=7_65 ignored
+              uid=7_66 ignored
+              uid=7_67 ignored
+            uid=7_68 ignored
+            uid=7_69 ignored
+            uid=7_70 ignored
+            uid=7_71 ignored
+            uid=7_72 ignored
+            uid=7_73 ignored
+            uid=7_74 ignored
+            uid=7_75 ignored
+          uid=7_76 generic
+          uid=7_77 ignored
+            uid=7_78 generic
+              uid=7_79 ignored
+                uid=7_80 ignored
+                  uid=7_81 generic
+                    uid=7_82 StaticText "Amazon never asks for fees or deposits in any form during recruitment process. Please click "
+                      uid=7_5 InlineTextBox "Amazon never asks for fees or deposits in any form during recruitment process. Please click "
+                    uid=7_83 link "here" url="https://amazon.jobs/content/en/how-we-hire/fraud-alert-india"
+                      uid=7_84 StaticText "here"
+                        uid=7_5 InlineTextBox "here"
+                    uid=7_85 StaticText " to learn more and safeguard yourself from potential frauds"
+                      uid=7_5 InlineTextBox " to learn more and safeguard "
+                      uid=7_5 InlineTextBox "yourself from potential frauds"
+          uid=7_86 generic
+            uid=7_87 ignored
+              uid=7_88 ignored
+                uid=7_89 ignored
+                  uid=7_90 ignored
+                    uid=7_91 LayoutTable
+                      uid=7_92 ignored
+                        uid=7_93 heading "SDE-1 (FTC)" level="1"
+                          uid=7_94 StaticText "SDE-1 (FTC)"
+                            uid=7_5 InlineTextBox "SDE-1 (FTC)"
+                        uid=7_95 generic
+                          uid=7_96 StaticText "Job ID: 10525636 | ADCI - Karnataka - A66"
+                            uid=7_5 InlineTextBox "Job ID: 10525636 | ADCI - Karnataka - A66"
+                    uid=7_97 generic
+                      uid=7_98 generic
+                        uid=7_99 link "Apply now for SDE-1 (FTC)" url="https://www.amazon.jobs/applicant/jobs/10525636/apply"
+                          uid=7_100 StaticText "Apply now"
+                            uid=7_5 InlineTextBox "Apply now"
+            uid=7_101 generic
+              uid=7_102 ignored
+                uid=7_103 generic
+                  uid=7_104 ignored
+                    uid=7_105 ignored
+                    uid=7_106 ignored
+                      uid=7_107 heading "Description" level="2"
+                        uid=7_108 StaticText "Description"
+                          uid=7_5 InlineTextBox "Description"
+                      uid=7_109 paragraph
+                        uid=7_110 StaticText "Cross Border Tech is looking for an experienced Software Development Engineer to work on our Cross Border technology stacks, which enables to launch new Cross Border arc with local language, local currency, local payments and build new features and enhancements. The Cross Border strategy, and roadmap is one of the most important initiatives across Amazon. You will design, architect and innovative technology solutions that will reduce time to market, standardize execution and scale for expansion globally. You will build, operate and play a key role in the evolution of our platform to solve the world's most complex technical challenges in Information extraction, Large-scale computing, Distributed systems, Web applications, Data mining, Scalability, Security, and Algorithms to name a few. You’ll strive for simplicity, and demonstrate significant creativity and high judgment. You will play a key role in stabilizing the day to day operations and improving the platform’s build and testing process, and ensure adherence to organizational software and security compliance."
+                          uid=7_5 InlineTextBox "Cross Border Tech is looking for an experienced Software Development Engineer to "
+                          uid=7_5 InlineTextBox "work on our Cross Border technology stacks, which enables to launch new Cross "
+                          uid=7_5 InlineTextBox "Border arc with local language, local currency, local payments and build new "
+                          uid=7_5 InlineTextBox "features and enhancements. The Cross Border strategy, and roadmap is one of the "
+                          uid=7_5 InlineTextBox "most important initiatives across Amazon. You will design, architect and innovative "
+                          uid=7_5 InlineTextBox "technology solutions that will reduce time to market, standardize execution and "
+                          uid=7_5 InlineTextBox "scale for expansion globally. You will build, operate and play a key role in the "
+                          uid=7_5 InlineTextBox "evolution of our platform to solve the world's most complex technical challenges in "
+                          uid=7_5 InlineTextBox "Information extraction, Large-scale computing, Distributed systems, Web "
+                          uid=7_5 InlineTextBox "applications, Data mining, Scalability, Security, and Algorithms to name a few. You’ll "
+                          uid=7_5 InlineTextBox "strive for simplicity, and demonstrate significant creativity and high judgment. You "
+                          uid=7_5 InlineTextBox "will play a key role in stabilizing the day to day operations and improving the "
+                          uid=7_5 InlineTextBox "platform’s build and testing process, and ensure adherence to organizational "
+                          uid=7_5 InlineTextBox "software and security compliance."
+                        uid=7_111 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_112 StaticText "The job is simple: make everything available to everyone all the time at the best possible price. The requirements are almost as simple - we’re looking for leaders and trailblazers who aren’t afraid of tackling massive scale, layered complexity and ambiguous requirements to empower our customers to shop the World. No two features are ever the same and our customers are hungry for every single one!"
+                          uid=7_5 InlineTextBox "The job is simple: make everything available to everyone all the time at the best "
+                          uid=7_5 InlineTextBox "possible price. The requirements are almost as simple - we’re looking for leaders "
+                          uid=7_5 InlineTextBox "and trailblazers who aren’t afraid of tackling massive scale, layered complexity and "
+                          uid=7_5 InlineTextBox "ambiguous requirements to empower our customers to shop the World. No two "
+                          uid=7_5 InlineTextBox "features are ever the same and our customers are hungry for every single one!"
+                        uid=7_113 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_114 StaticText "What to expect day-to-day:"
+                          uid=7_5 InlineTextBox "What to expect day-to-day:"
+                        uid=7_115 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_116 StaticText "• Solve complex problems through data, rapidly."
+                          uid=7_5 InlineTextBox "• Solve complex problems through data, rapidly."
+                        uid=7_117 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_118 StaticText "• Design and develop state of the art software systems that address these complex and ambiguous problems."
+                          uid=7_5 InlineTextBox "• Design and develop state of the art software systems that address these complex "
+                          uid=7_5 InlineTextBox "and ambiguous problems."
+                        uid=7_119 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_120 StaticText "• Own the inputs and the business outcome through cultivating a culture of relentless auditing and metric monitoring, automatically where possible."
+                          uid=7_5 InlineTextBox "• Own the inputs and the business outcome through cultivating a culture of "
+                          uid=7_5 InlineTextBox "relentless auditing and metric monitoring, automatically where possible."
+                        uid=7_121 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_122 StaticText "This is a contractual position which is ideal for candidates who are looking to deal with scaling challenges at Amazon and ready to build mission critical system software applications and tools. It is also an opportunity for freelance candidates to become domain experts and have an enormous opportunity to make a large impact on the design, architecture and development of consumer products. Depending on individual performance this experience can lead to permanent positions as Software Development Engineers at Amazon."
+                          uid=7_5 InlineTextBox "This is a contractual position which is ideal for candidates who are looking to deal "
+                          uid=7_5 InlineTextBox "with scaling challenges at Amazon and ready to build mission critical system "
+                          uid=7_5 InlineTextBox "software applications and tools. It is also an opportunity for freelance candidates to "
+                          uid=7_5 InlineTextBox "become domain experts and have an enormous opportunity to make a large impact "
+                          uid=7_5 InlineTextBox "on the design, architecture and development of consumer products. Depending on "
+                          uid=7_5 InlineTextBox "individual performance this experience can lead to permanent positions as Software "
+                          uid=7_5 InlineTextBox "Development Engineers at Amazon."
+                        uid=7_123 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_124 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_125 StaticText "Key job responsibilities"
+                          uid=7_5 InlineTextBox "Key job responsibilities"
+                        uid=7_126 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_127 StaticText "What to expect day-to-day:"
+                          uid=7_5 InlineTextBox "What to expect day-to-day:"
+                        uid=7_128 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_129 StaticText "• Solve complex problems through data, rapidly."
+                          uid=7_5 InlineTextBox "• Solve complex problems through data, rapidly."
+                        uid=7_130 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_131 StaticText "• Design and develop state of the art software systems that address these complex and ambiguous problems."
+                          uid=7_5 InlineTextBox "• Design and develop state of the art software systems that address these complex "
+                          uid=7_5 InlineTextBox "and ambiguous problems."
+                        uid=7_132 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_133 StaticText "• Own the inputs and the business outcome through cultivating a culture of relentless auditing and metric monitoring, automatically where possible."
+                          uid=7_5 InlineTextBox "• Own the inputs and the business outcome through cultivating a culture of "
+                          uid=7_5 InlineTextBox "relentless auditing and metric monitoring, automatically where possible."
+                    uid=7_134 ignored
+                      uid=7_135 heading "Basic Qualifications" level="2"
+                        uid=7_136 StaticText "Basic Qualifications"
+                          uid=7_5 InlineTextBox "Basic Qualifications"
+                      uid=7_137 paragraph
+                        uid=7_138 StaticText "- 1+ years of non-internship professional software development experience"
+                          uid=7_5 InlineTextBox "- 1+ years of non-internship professional software development experience"
+                        uid=7_139 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_140 StaticText "- Experience programming with at least one software programming language"
+                          uid=7_5 InlineTextBox "- Experience programming with at least one software programming language"
+                    uid=7_141 ignored
+                      uid=7_142 heading "Preferred Qualifications" level="2"
+                        uid=7_143 StaticText "Preferred Qualifications"
+                          uid=7_5 InlineTextBox "Preferred Qualifications"
+                      uid=7_144 paragraph
+                        uid=7_145 StaticText "- Bachelor's degree in computer science or equivalent"
+                          uid=7_5 InlineTextBox "- Bachelor's degree in computer science or equivalent"
+                        uid=7_146 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_147 LineBreak "
+"
+                          uid=7_5 InlineTextBox "
+"
+                        uid=7_148 StaticText "Our inclusive culture empowers Amazonians to deliver the best results for our customers. If you have a disability and need a workplace accommodation or adjustment during the application and hiring process, including support for the interview or onboarding process, please visit "
+                          uid=7_5 InlineTextBox "Our inclusive culture empowers Amazonians to deliver the best results for our "
+                          uid=7_5 InlineTextBox "customers. If you have a disability and need a workplace accommodation or "
+                          uid=7_5 InlineTextBox "adjustment during the application and hiring process, including support for the "
+                          uid=7_5 InlineTextBox "interview or onboarding process, please visit "
+                        uid=7_149 link "https://amazon.jobs/content/en/how-we-hire/accommodations" url="https://amazon.jobs/content/en/how-we-hire/accommodations"
+                          uid=7_150 StaticText "https://amazon.jobs/content/en/how-we-hire/accommodations"
+                            uid=7_5 InlineTextBox "https://amazon.jobs/content/en/how-"
+                            uid=7_5 InlineTextBox "we-hire/accommodations"
+                        uid=7_151 StaticText " for more information. If the country/region you’re applying in isn’t listed, please contact your Recruiting Partner."
+                          uid=7_5 InlineTextBox " for more information. If the country/region you’re "
+                          uid=7_5 InlineTextBox "applying in isn’t listed, please contact your Recruiting Partner."
+                uid=7_152 generic
+                  uid=7_153 ignored
+                    uid=7_154 ignored
+                      uid=7_155 generic
+                        uid=7_156 heading "Job details" level="2"
+                          uid=7_157 StaticText "Job details"
+                            uid=7_5 InlineTextBox "Job details"
+                      uid=7_158 list
+                        uid=7_159 listitem level="1"
+                          uid=7_160 ignored
+                            uid=7_161 image "location"
+                            uid=7_162 list
+                              uid=7_163 listitem level="2"
+                                uid=7_164 StaticText "IND, KA, Bengaluru"
+                                  uid=7_5 InlineTextBox "IND, KA, Bengaluru"
+                        uid=7_165 listitem level="1"
+                          uid=7_166 generic
+                            uid=7_167 image "category"
+                            uid=7_168 list
+                              uid=7_169 link "Job category Software Development" url="https://amazon.jobs/en/job_categories/software-development"
+                                uid=7_170 StaticText "Software Development"
+                                  uid=7_5 InlineTextBox "Software Development"
+                    uid=7_171 ignored
+                      uid=7_172 ignored
+                        uid=7_173 generic
+                          uid=7_174 ignored
+                            uid=7_175 heading "Related jobs" level="2"
+                              uid=7_176 StaticText "Related jobs"
+                                uid=7_5 InlineTextBox "Related jobs"
+                            uid=7_177 list
+                              uid=7_178 listitem level="1"
+                                uid=7_179 link "Software Development Engineer II, Amazon Pharmacy" url="https://amazon.jobs/en/jobs/10552119/software-development-engineer-ii-amazon-pharmacy"
+                                  uid=7_180 StaticText "Software Development Engineer II, Amazon Pharmacy"
+                                    uid=7_5 InlineTextBox "Software Development Engineer II, "
+                                    uid=7_5 InlineTextBox "Amazon Pharmacy"
+                                uid=7_181 generic
+                                  uid=7_182 StaticText "Location:"
+                                    uid=7_5 InlineTextBox "Location:"
+                                  uid=7_183 StaticText "IND, KA, Bengaluru"
+                                    uid=7_5 InlineTextBox "IND, KA, Bengaluru"
+                                uid=7_184 generic
+                                  uid=7_185 StaticText "Posted:"
+                                    uid=7_5 InlineTextBox "Posted:"
+                                  uid=7_186 StaticText "September 17, 2026"
+                                    uid=7_5 InlineTextBox "September 17, 2026"
+                                  uid=7_187 StaticText "(Updated about 2 hours ago)"
+                                    uid=7_5 InlineTextBox "(Updated about 2 hours ago)"
+                              uid=7_188 listitem level="1"
+                                uid=7_189 link "Software Development Engineer II, AWS Compliance & Security Assurance, Denied Party Screening" url="https://amazon.jobs/en/jobs/10507385/software-development-engineer-ii-aws-compliance-security-assurance-denied-party-screening"
+                                  uid=7_190 StaticText "Software Development Engineer II, AWS Compliance & Security Assurance, Denied Party Screening"
+                                    uid=7_5 InlineTextBox "Software Development Engineer II, "
+                                    uid=7_5 InlineTextBox "AWS Compliance & Security Assurance, "
+                                    uid=7_5 InlineTextBox "Denied Party Screening"
+                                uid=7_191 generic
+                                  uid=7_192 StaticText "Location:"
+                                    uid=7_5 InlineTextBox "Location:"
+                                  uid=7_193 StaticText "IND, KA, Bengaluru"
+                                    uid=7_5 InlineTextBox "IND, KA, Bengaluru"
+                                uid=7_194 generic
+                                  uid=7_195 StaticText "Posted:"
+                                    uid=7_5 InlineTextBox "Posted:"
+                                  uid=7_196 StaticText "August 19, 2026"
+                                    uid=7_5 InlineTextBox "August 19, 2026"
+                                  uid=7_197 StaticText "(Updated about 2 hours ago)"
+                                    uid=7_5 InlineTextBox "(Updated about 2 hours ago)"
+                              uid=7_198 listitem level="1"
+                                uid=7_199 link "Software Development Engineer II , Amazon Cross Border Tech" url="https://amazon.jobs/en/jobs/10484877/software-development-engineer-ii-amazon-cross-border-tech"
+                                  uid=7_200 StaticText "Software Development Engineer II , Amazon Cross Border Tech"
+                                    uid=7_5 InlineTextBox "Software Development Engineer II , "
+                                    uid=7_5 InlineTextBox "Amazon Cross Border Tech"
+                                uid=7_201 generic
+                                  uid=7_202 StaticText "Location:"
+                                    uid=7_5 InlineTextBox "Location:"
+                                  uid=7_203 StaticText "IND, KA, Bengaluru"
+                                    uid=7_5 InlineTextBox "IND, KA, Bengaluru"
+                                uid=7_204 generic
+                                  uid=7_205 StaticText "Posted:"
+                                    uid=7_5 InlineTextBox "Posted:"
+                                  uid=7_206 StaticText "July 27, 2026"
+                                    uid=7_5 InlineTextBox "July 27, 2026"
+                                  uid=7_207 StaticText "(Updated about 3 hours ago)"
+                                    uid=7_5 InlineTextBox "(Updated about 3 hours ago)"
+                              uid=7_208 listitem level="1"
+                                uid=7_209 link "Software Development Engineer, CAM" url="https://amazon.jobs/en/jobs/10563367/software-development-engineer-cam"
+                                  uid=7_210 StaticText "Software Development Engineer, CAM"
+                                    uid=7_5 InlineTextBox "Software Development Engineer, CAM"
+                                uid=7_211 generic
+                                  uid=7_212 StaticText "Location:"
+                                    uid=7_5 InlineTextBox "Location:"
+                                  uid=7_213 StaticText "IND, KA, Bengaluru"
+                                    uid=7_5 InlineTextBox "IND, KA, Bengaluru"
+                                uid=7_214 generic
+                                  uid=7_215 StaticText "Posted:"
+                                    uid=7_5 InlineTextBox "Posted:"
+                                  uid=7_216 StaticText "September 29, 2026"
+                                    uid=7_5 InlineTextBox "September 29, 2026"
+                                  uid=7_217 StaticText "(Updated about 4 hours ago)"
+                                    uid=7_5 InlineTextBox "(Updated about 4 hours ago)"
+                              uid=7_218 listitem level="1"
+                                uid=7_219 link "Software Development Engineer, Tax Engine Services" url="https://amazon.jobs/en/jobs/10478694/software-development-engineer-tax-engine-services"
+                                  uid=7_220 StaticText "Software Development Engineer, Tax Engine Services"
+                                    uid=7_5 InlineTextBox "Software Development Engineer, Tax "
+                                    uid=7_5 InlineTextBox "Engine Services"
+                                uid=7_221 generic
+                                  uid=7_222 StaticText "Location:"
+                                    uid=7_5 InlineTextBox "Location:"
+                                  uid=7_223 StaticText "IND, KA, Bengaluru"
+                                    uid=7_5 InlineTextBox "IND, KA, Bengaluru"
+                                uid=7_224 generic
+                                  uid=7_225 StaticText "Posted:"
+                                    uid=7_5 InlineTextBox "Posted:"
+                                  uid=7_226 StaticText "July 20, 2026"
+                                    uid=7_5 InlineTextBox "July 20, 2026"
+                                  uid=7_227 StaticText "(Updated about 4 hours ago)"
+                                    uid=7_5 InlineTextBox "(Updated about 4 hours ago)"
+                    uid=7_228 ignored
+                      uid=7_229 generic
+                        uid=7_230 ignored
+                          uid=7_231 generic
+                            uid=7_232 heading "Share this job" level="2"
+                              uid=7_233 StaticText "Share this job"
+                                uid=7_5 InlineTextBox "Share this job"
+                        uid=7_234 ignored
+                          uid=7_235 list
+                            uid=7_236 listitem level="1"
+                              uid=7_237 link "Share with facebook" url="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Famazon.jobs%2Fen%2Fjobs%2F10525636%2Fsde-1-ftc"
+                                uid=7_238 ignored
+                                  uid=7_5 StaticText "b"
+                                    uid=7_5 InlineTextBox "b"
+                            uid=7_239 listitem level="1"
+                              uid=7_240 link "Share with linkedin" url="https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Famazon.jobs%2Fen%2Fjobs%2F10525636%2Fsde-1-ftc&title=SDE-1%20%28FTC%29&summary=Cross%20Border%20Tech%20%20is%20looking%20for%20an%20experienced%20Software%20Development%20Engineer%20to%20work%20on%20our%20Cross%20Border%20technology%20stacks%2C%20which%20enables%20to%20launch%20new%20Cross%20Border%20%20arc%20with%20local%20language%2C%20local%20currency%2C%20local%20payments%20and%20build%20new%20features..."
+                                uid=7_241 ignored
+                                  uid=7_5 StaticText "d"
+                                    uid=7_5 InlineTextBox "d"
+                            uid=7_242 listitem level="1"
+                              uid=7_243 link "Share with twitter" url="https://twitter.com/intent/tweet?text=https%3A%2F%2Famazon.jobs%2Fen%2Fjobs%2F10525636"
+                                uid=7_244 ignored
+                                  uid=7_5 StaticText "j"
+                                    uid=7_5 InlineTextBox "j"
+                            uid=7_245 listitem level="1"
+                              uid=7_246 link "Share with email" url="mailto:?body=https%3A%2F%2Famazon.jobs%2Fen%2Fjobs%2F10525636&subject=Take%20a%20look%20at%20this%20job"
+                                uid=7_247 ignored
+                                  uid=7_5 StaticText "l"
+                                    uid=7_5 InlineTextBox "l"
+                            uid=7_248 listitem level="1"
+                              uid=7_249 link "Print this job" url="https://amazon.jobs/en/jobs/10525636/sde-1-ftc#"
+                                uid=7_250 ignored
+                                  uid=7_5 StaticText "m"
+                                    uid=7_5 InlineTextBox "m"
+        uid=7_251 generic
+          uid=7_252 ignored
+            uid=7_253 ignored
+              uid=7_254 ignored
+                uid=7_255 generic
+                  uid=7_256 StaticText "JOIN US ON"
+                    uid=7_5 InlineTextBox "JOIN US ON"
+                uid=7_257 list
+                  uid=7_258 listitem level="1"
+                    uid=7_259 link "Join us on facebook" url="https://www.facebook.com/InsideAmazon/?Amazon.jobs=footer"
+                      uid=7_260 ignored
+                        uid=7_5 StaticText "b"
+                          uid=7_5 InlineTextBox "b"
+                  uid=7_261 listitem level="1"
+                    uid=7_262 link "Join us on linkedin" url="https://www.linkedin.com/company/amazon?Amazon.jobs=footer"
+                      uid=7_263 ignored
+                        uid=7_5 StaticText "d"
+                          uid=7_5 InlineTextBox "d"
+                  uid=7_264 listitem level="1"
+                    uid=7_265 link "Join us on instagram" url="https://www.instagram.com/insideamazon/?Amazon.jobs=footer"
+                      uid=7_266 ignored
+                        uid=7_5 StaticText "c"
+                          uid=7_5 InlineTextBox "c"
+                  uid=7_267 listitem level="1"
+                    uid=7_268 link "Join us on twitter" url="https://twitter.com/amazonnews?Amazon.jobs=footer"
+                      uid=7_269 ignored
+                        uid=7_5 StaticText "j"
+                          uid=7_5 InlineTextBox "j"
+                uid=7_270 ignored
+                  uid=7_271 generic
+                    uid=7_272 StaticText "DOWNLOAD OUR APP"
+                      uid=7_5 InlineTextBox "DOWNLOAD OUR APP"
+                  uid=7_273 list
+                    uid=7_274 listitem level="1"
+                      uid=7_275 link "Download Amazon A to Z from App Store" url="https://apple.co/4mW6qxK"
+                    uid=7_276 listitem level="1"
+                      uid=7_277 link "Download Amazon A to Z from Google Play" url="https://bit.ly/46JGIYu"
+              uid=7_278 ignored
+          uid=7_279 ignored
+            uid=7_280 ignored
+              uid=7_281 ignored
+                uid=7_282 generic
+                  uid=7_283 StaticText "Find Careers"
+                    uid=7_5 InlineTextBox "Find Careers"
+                  uid=7_284 list
+                    uid=7_285 listitem level="1"
+                      uid=7_286 link "Job Categories" url="https://amazon.jobs/content/en/job-categories"
+                        uid=7_287 StaticText "Job Categories"
+                          uid=7_5 InlineTextBox "Job Categories"
+                    uid=7_288 listitem level="1"
+                      uid=7_289 link "Teams" url="https://amazon.jobs/content/en/teams"
+                        uid=7_290 StaticText "Teams"
+                          uid=7_5 InlineTextBox "Teams"
+                    uid=7_291 listitem level="1"
+                      uid=7_292 link "Locations" url="https://amazon.jobs/content/en/locations"
+                        uid=7_293 StaticText "Locations"
+                          uid=7_5 InlineTextBox "Locations"
+                    uid=7_294 listitem level="1"
+                      uid=7_295 link "Military careers" url="https://amazon.jobs/content/en/career-programs/military"
+                        uid=7_296 StaticText "Military careers"
+                          uid=7_5 InlineTextBox "Military careers"
+                    uid=7_297 listitem level="1"
+                      uid=7_298 link "Hourly" url="https://amazon.jobs/content/en/hourly"
+                        uid=7_299 StaticText "Hourly"
+                          uid=7_5 InlineTextBox "Hourly"
+                uid=7_300 generic
+                  uid=7_301 StaticText "Working At Amazon"
+                    uid=7_5 InlineTextBox "Working At Amazon"
+                  uid=7_302 list
+                    uid=7_303 listitem level="1"
+                      uid=7_304 link "Culture" url="https://amazon.jobs/content/en/our-workplace"
+                        uid=7_305 StaticText "Culture"
+                          uid=7_5 InlineTextBox "Culture"
+                    uid=7_306 listitem level="1"
+                      uid=7_307 link "Benefits" url="https://amazon.jobs/content/en/benefits"
+                        uid=7_308 StaticText "Benefits"
+                          uid=7_5 InlineTextBox "Benefits"
+                    uid=7_309 listitem level="1"
+                      uid=7_310 link "Amazon Newsletter" url="https://email.aboutamazon.com/l/637851/2020-10-29/pd87g?utm_campaign=newslettersubscribers&utm_content=amazonnewssignup&utm_medium=amazonjobs&utm_source=footer"
+                        uid=7_311 StaticText "Amazon Newsletter"
+                          uid=7_5 InlineTextBox "Amazon Newsletter"
+                    uid=7_312 listitem level="1"
+                      uid=7_313 link "Inclusive experiences" url="https://amazon.jobs/content/en/our-workplace/inclusive-experiences"
+                        uid=7_314 StaticText "Inclusive experiences"
+                          uid=7_5 InlineTextBox "Inclusive experiences"
+                    uid=7_315 listitem level="1"
+                      uid=7_316 link "Leadership Principles" url="https://amazon.jobs/content/en/our-workplace/leadership-principles"
+                        uid=7_317 StaticText "Leadership Principles"
+                          uid=7_5 InlineTextBox "Leadership Principles"
+                uid=7_318 generic
+                  uid=7_319 StaticText "Help"
+                    uid=7_5 InlineTextBox "Help"
+                  uid=7_320 list
+                    uid=7_321 listitem level="1"
+                      uid=7_322 link "FAQ" url="https://amazon.jobs/content/en/faq"
+                        uid=7_323 StaticText "FAQ"
+                          uid=7_5 InlineTextBox "FAQ"
+                    uid=7_324 listitem level="1"
+                      uid=7_325 link "How We Hire" url="https://amazon.jobs/content/en/how-we-hire#onlineapp"
+                        uid=7_326 StaticText "How We Hire"
+                          uid=7_5 InlineTextBox "How We Hire"
+                    uid=7_327 listitem level="1"
+                      uid=7_328 link "Application status" url="https://www.amazon.jobs/applicant/check_application_status"
+                        uid=7_329 StaticText "Application status"
+                          uid=7_5 InlineTextBox "Application status"
+                    uid=7_330 listitem level="1"
+                      uid=7_331 link "Accommodations" url="https://amazon.jobs/content/en/how-we-hire/accommodations"
+                        uid=7_332 StaticText "Accommodations"
+                          uid=7_5 InlineTextBox "Accommodations"
+                    uid=7_333 listitem level="1"
+                      uid=7_334 link "Legal disclosures and notices" url="https://amazon.jobs/content/en/legal-disclosures-and-notices"
+                        uid=7_335 StaticText "Legal disclosures and notices"
+                          uid=7_5 InlineTextBox "Legal disclosures and notices"
+                uid=7_336 generic
+                  uid=7_337 ignored
+                    uid=7_338 ignored
+                      uid=7_339 ignored
+                        uid=7_340 generic
+                          uid=7_341 combobox "English" expandable haspopup="menu" value="English"
+                            uid=7_342 ignored
+                              uid=7_343 ignored
+                                uid=7_5 image
+                            uid=7_344 StaticText "English"
+                              uid=7_5 InlineTextBox "English"
+                            uid=7_345 generic
+                          uid=7_346 ignored
+                            uid=7_347 ignored
+                            uid=7_348 ignored
+                            uid=7_349 ignored
+                            uid=7_350 ignored
+                            uid=7_351 ignored
+                            uid=7_352 ignored
+                            uid=7_353 ignored
+                            uid=7_354 ignored
+                            uid=7_355 ignored
+                            uid=7_356 ignored
+                            uid=7_357 ignored
+                      uid=7_358 ignored
+                        uid=7_359 ignored
+                        uid=7_360 ignored
+                        uid=7_361 ignored
+                        uid=7_362 ignored
+                        uid=7_363 ignored
+                        uid=7_364 ignored
+                        uid=7_365 ignored
+                        uid=7_366 ignored
+                        uid=7_367 ignored
+                        uid=7_368 ignored
+                        uid=7_369 ignored
+          uid=7_370 generic
+            uid=7_371 ignored
+              uid=7_372 ignored
+                uid=7_373 generic
+                  uid=7_374 StaticText "Amazon is an equal opportunity employer and does not discriminate on the basis of protected veteran status, disability, or other legally protected status. Veterans, military spouses, and people with disabilities are encouraged to apply."
+                    uid=7_5 InlineTextBox "Amazon is an equal opportunity employer and does not discriminate on the basis "
+                    uid=7_5 InlineTextBox "of protected veteran status, disability, or other legally protected status. Veterans, "
+                    uid=7_5 InlineTextBox "military spouses, and people with disabilities are encouraged to apply."
+                uid=7_375 generic
+                  uid=7_376 link "Privacy and Data" url="https://amazon.jobs/en/privacy_page"
+                    uid=7_377 StaticText "Privacy and Data"
+                      uid=7_5 InlineTextBox "Privacy and Data"
+                  uid=7_378 link "Impressum" url="https://amazon.jobs/en/impressum"
+                    uid=7_379 StaticText "Impressum"
+                      uid=7_5 InlineTextBox "Impressum"
+                uid=7_380 generic
+                  uid=7_381 StaticText "© 1996-2026, Amazon.com, Inc. or its affiliates"
+                    uid=7_5 InlineTextBox "© 1996-2026, Amazon.com, Inc. or its "
+                    uid=7_5 InlineTextBox "affiliates"
+            uid=7_382 ignored
+        uid=7_383 ignored
+      uid=7_384 generic

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { runTask, type RunEventKind, type Usage } from "./agent.js";
 import { buildPrompt, extractApproval, extractAttention, extractJson, type TaskMode } from "./markers.js";
 import { findLatestScreenshot, sendAttentionEmail } from "./notify.js";
+import { ensureChrome } from "./chrome.js";
 
 const CLOUD_API_URL = process.env.CLOUD_API_URL ?? "http://localhost:3000";
 const DEVICE_ID = process.env.DEVICE_ID ?? "laptop-1";
@@ -83,7 +84,8 @@ async function uploadScreenshot(taskId: string, taskStartedAt: number): Promise<
   try {
     const bytes = await readFile(path);
     const form = new FormData();
-    form.append("file", new Blob([bytes], { type: "image/png" }), `attention-${taskId}.png`);
+    const jpg = path.endsWith(".jpg");
+    form.append("file", new Blob([bytes], { type: jpg ? "image/jpeg" : "image/png" }), `attention-${taskId}.${jpg ? "jpg" : "png"}`);
     const res = await fetch(`${CLOUD_API_URL}/api/uploads`, { method: "POST", headers: authHeaders(), body: form });
     if (!res.ok) return undefined;
     const data: { url: string } = await res.json();
@@ -94,7 +96,23 @@ async function uploadScreenshot(taskId: string, taskStartedAt: number): Promise<
   }
 }
 
+let chromeOutage = false;
+
 async function pollOnce(): Promise<void> {
+  // Don't claim a task the browser can't run: while Chrome is down (and can't be restarted) tasks
+  // stay queued instead of each failing, and the user is told once per outage.
+  try {
+    await ensureChrome();
+    chromeOutage = false;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!chromeOutage) {
+      chromeOutage = true;
+      console.error(`[poller] not taking tasks: ${message}`);
+      await sendAttentionEmail({ taskId: "-", prompt: "Browser unavailable", description: `${message}\nQueued tasks will wait until Chrome is back.`, taskStartedAt: Date.now(), kind: "Paused" });
+    }
+    return;
+  }
   const res = await fetch(`${CLOUD_API_URL}/api/tasks/next?device=${DEVICE_ID}`, { headers: authHeaders() });
   if (res.status === 204) return;
   if (!res.ok) {
@@ -122,6 +140,7 @@ async function pollOnce(): Promise<void> {
       task.sessionId,
       (kind, message) => postEvent(task.id, kind, message),
       task.attachments ?? [],
+      { includeContext: task.mode !== "qa" },
     );
     output = result.output;
     sessionId = result.sessionId;
@@ -133,6 +152,8 @@ async function pollOnce(): Promise<void> {
     await reportResult(task.id, "failed", message, task.sessionId).catch((reportErr) =>
       console.error(`[poller] also failed to report failure for ${task.id}`, reportErr),
     );
+    // Unattended runs: a failure is as worth knowing about as a block.
+    await sendAttentionEmail({ taskId: task.id, prompt: task.prompt, description: `The task failed: ${message}`, dashboardUrl: `${CLOUD_API_URL}/`, taskStartedAt, kind: "Failed" });
     return;
   }
 

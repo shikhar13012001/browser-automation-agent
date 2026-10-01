@@ -1,0 +1,10 @@
+uid=5_0 RootWebArea "Intent Agent" url="http://127.0.0.1:3101/"
+  uid=5_1 main
+    uid=5_2 heading "Intent Agent" level="1"
+    uid=5_3 StaticText "No device connected -- start the daemon"
+    uid=5_4 textbox "What should I do?" multiline value="Test ScheduRx as a doctor."
+    uid=5_5 StaticText "Attach files"
+    uid=5_6 button "Run"
+  uid=5_7 alert atomic live="assertive" relevant="additions text"
+  uid=5_8 group "grammarly-integration"
+    uid=5_9 StaticText "{"mode":"full","isActive":true,"isUserDisabled":false}"
