@@ -1,0 +1,26 @@
+[
+  {
+    "config": "luna-low",
+    "engine": "direct",
+    "tool": "intent-browser",
+    "model": "openai/gpt-6-luna",
+    "effort": "low",
+    "run": 1,
+    "submitted": true,
+    "fieldsCorrect": "18/18",
+    "success": true,
+    "reportedRef": true,
+    "wrongFields": [],
+    "seconds": 30,
+    "steps": 11,
+    "toolCalls": 10,
+    "freshInput": 2410,
+    "cachedInput": 89159,
+    "output": 802,
+    "reasoning": 81,
+    "costUsd": 0.00153,
+    "usedModel": "openai/gpt-6-luna",
+    "error": "",
+    "answer": "Submitted the application for Software Development Engineer I – Backend at Northwind using your Core SWE resume.\n\n**Reference number: NW-64GEIW**"
+  }
+]

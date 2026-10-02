@@ -1,12 +1,12 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import puppeteer, { type Browser, type ElementHandle, type Frame, type HTTPRequest, type Page, type Target } from "puppeteer-core";
+import { DIR, WORKER, workerFile } from "./paths.js";
+import { dirname } from "node:path";
+import puppeteer, { type Browser, type ElementHandle, type CDPSession, type Frame, type HTTPRequest, type Page, type Target } from "puppeteer-core";
 import { EXTRACT_SRC } from "./extract-src.js";
 import { formatState, type FrameData } from "./format.js";
 
 const CDP_URL = process.env.INTENT_BROWSER_CDP_URL ?? "http://127.0.0.1:9222";
-export const SCREENSHOT_PATH = join(tmpdir(), "intent-browser", "latest.jpg");
+export const SCREENSHOT_PATH = workerFile("latest.jpg");
 const FRAME_STRIDE = 100_000;
 
 let browser: Browser | undefined;
@@ -59,6 +59,12 @@ async function getBrowser(): Promise<Browser> {
   return browser;
 }
 
+// A single agent works in the tab the user would be looking at. Parallel workers don't fight over
+// the foreground: focus emulation (below) keeps each of their tabs rendering in the background.
+async function toFront(page: Page): Promise<void> {
+  if (!WORKER) await page.bringToFront().catch(() => {});
+}
+
 const watched = new WeakSet<Page>();
 
 // Chrome stops rendering a window that other apps cover, and the user being away usually means
@@ -66,12 +72,32 @@ const watched = new WeakSet<Page>();
 // gets its timers throttled, so puppeteer's click() (which waits on an IntersectionObserver) hung
 // until the 60s protocol timeout on every action. Focus emulation makes Chrome treat the page as
 // visible and focused, whatever is on top of it. It lasts as long as this CDP session stays open.
+const pageSession = new WeakMap<Page, CDPSession>();
+
 async function keepRendering(page: Page): Promise<void> {
   try {
     const s = await page.createCDPSession();
+    pageSession.set(page, s);
     await s.send("Emulation.setFocusEmulationEnabled", { enabled: true });
   } catch {
     // older Chrome or a closing tab; actions still work, just slower when the window is covered
+  }
+}
+
+// A cross-origin iframe lives in its own renderer process with its own CDP session, and the page's
+// focus emulation doesn't reach it: in a background tab (a parallel worker's) it stayed unfocusable,
+// so text typed "into" a payment or embedded form frame went nowhere. Each frame's session gets the
+// same treatment the first time the frame is seen.
+const emulated = new WeakSet<object>();
+async function keepFrameRendering(frame: Frame): Promise<void> {
+  try {
+    // `client` exists on puppeteer's CDP frames but isn't in the public Frame type.
+    const session = (frame as unknown as { client?: { send(method: string, params: object): Promise<unknown> } }).client;
+    if (!session || emulated.has(session)) return;
+    emulated.add(session);
+    await session.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+  } catch {
+    // detached frame or a session that doesn't support it; nothing to do
   }
 }
 
@@ -100,7 +126,7 @@ async function onTargetCreated(target: Target): Promise<void> {
   current = page;
   await watchPage(page);
   // Chrome throttles background tabs (timers, rendering); work in the tab the user would be looking at.
-  await page.bringToFront().catch(() => {});
+  await toFront(page);
   notes.push(`A new tab opened (${target.url() || "loading"}) -- now working in it.`);
   // Sign-in popups ("Continue with Google") close themselves when done; carry on in the tab that opened them.
   page.once("close", () => {
@@ -112,10 +138,10 @@ async function onTargetCreated(target: Target): Promise<void> {
   });
 }
 
-const HOME_TAB_FILE = join(tmpdir(), "intent-browser", "home-tab.txt");
+const HOME_TAB_FILE = workerFile("home-tab.txt");
 // Tabs the agent opened (Apply buttons, popups), across server restarts: ownedPages only knows the
 // current process's, so leftovers from earlier runs piled up (9 tabs after a day of benchmarks).
-const OWNED_TABS_FILE = join(tmpdir(), "intent-browser", "owned-tabs.txt");
+const OWNED_TABS_FILE = workerFile("owned-tabs.txt");
 
 async function rememberOwned(page: Page): Promise<void> {
   const id = targetId(page);
@@ -182,7 +208,7 @@ export async function openUrl(url: string): Promise<void> {
   }
   for (const p of [...ownedPages]) if (p.isClosed()) ownedPages.delete(p);
   await closeLeftoverTabs(await getBrowser(), page);
-  await page.bringToFront().catch(() => {});
+  await toFront(page);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45_000 });
   await settle(page, true);
   // Client-side redirects (auth checks, SPA routing) often fire just after the page looks done.
@@ -207,7 +233,7 @@ export async function switchTab(index: number): Promise<void> {
   if (!p) throw new Error(`No tab ${index + 1}; there are ${pages.length}.`);
   current = p;
   await watchPage(p);
-  await p.bringToFront().catch(() => {});
+  await toFront(p);
 }
 
 export async function closeTab(index: number): Promise<void> {
@@ -329,15 +355,24 @@ function baseFor(frame: Frame, isMain: boolean): number {
 export async function readState(opts: { all?: boolean; text?: boolean } = {}): Promise<string> {
   const page = await getPage();
   const frames: FrameData[] = [];
-  for (const frame of page.frames()) {
+  // All frames are read at once: an ad-heavy page has 10-20 iframes, and one after another they
+  // added up. A sub-frame that doesn't answer within 3s (a hung ad or tracker) is left out rather
+  // than holding up the whole read.
+  const candidates = page.frames().filter((f) => f === page.mainFrame() || !(f.detached || f.url() === "about:blank" || !f.url()));
+  await Promise.all(candidates.map(keepFrameRendering));
+  const results = await Promise.all(
+    candidates.map((frame) => {
+      const isMain = frame === page.mainFrame();
+      const read = frame.evaluate(`${EXTRACT_SRC}(${JSON.stringify({ all: !!opts.all, text: !!opts.text && isMain })})`) as Promise<FrameData>;
+      const guarded = isMain ? read : Promise.race([read, new Promise<undefined>((r) => setTimeout(() => r(undefined), 3000))]);
+      return guarded.catch(() => undefined);
+    }),
+  );
+  for (let fi = 0; fi < candidates.length; fi++) {
+    const frame = candidates[fi];
+    const data = results[fi];
     const isMain = frame === page.mainFrame();
-    if (!isMain && (frame.detached || frame.url() === "about:blank" || !frame.url())) continue;
-    let data: FrameData;
-    try {
-      data = (await frame.evaluate(`${EXTRACT_SRC}(${JSON.stringify({ all: !!opts.all, text: !!opts.text && isMain })})`)) as FrameData;
-    } catch {
-      continue;
-    }
+    if (!data) continue;
     if (!isMain && !data.items.length) continue;
     const base = baseFor(frame, isMain);
     if (isMain) baseFrame.set(0, frame);
@@ -381,6 +416,20 @@ export async function resolve(id: number): Promise<{ handle: ElementHandle<Eleme
   return { handle: asEl as ElementHandle<Element>, frame };
 }
 
+// Captures through CDP directly. puppeteer's page.screenshot() activates the tab first, and with
+// several workers that meant tabs stealing the foreground from each other after every action --
+// which broke typing into cross-origin iframes in whichever tab had just lost it. Focus emulation
+// keeps a background tab rendering, so it can be captured where it is.
+async function capture(page: Page, params: { format: "jpeg" | "png"; quality?: number; clip?: { x: number; y: number; width: number; height: number; scale: number } }): Promise<string> {
+  let s = pageSession.get(page);
+  if (!s) {
+    s = await page.createCDPSession();
+    pageSession.set(page, s);
+  }
+  const r = (await s.send("Page.captureScreenshot", params)) as { data: string };
+  return r.data;
+}
+
 // Only used to attach to attention alerts, so it never holds up the agent: it runs in the
 // background (one at a time, latest request wins) with a short timeout -- capturing a tab Chrome
 // considers hidden can stall until the 60s CDP timeout, which once added minutes to a run.
@@ -396,9 +445,11 @@ export async function saveScreenshot(page: Page): Promise<void> {
         const p = shotPending;
         shotPending = undefined;
         if (p.isClosed()) continue;
-        await mkdir(join(tmpdir(), "intent-browser"), { recursive: true }).catch(() => {});
+        await mkdir(DIR, { recursive: true }).catch(() => {});
         await Promise.race([
-          p.screenshot({ path: SCREENSHOT_PATH as `${string}.jpeg`, type: "jpeg", quality: 60 }).catch(() => {}),
+          capture(p, { format: "jpeg", quality: 60 })
+            .then((data) => writeFile(SCREENSHOT_PATH, Buffer.from(data, "base64")))
+            .catch(() => {}),
           new Promise((r) => setTimeout(r, 4000)),
         ]);
       }
@@ -417,11 +468,6 @@ export async function screenshotBase64(): Promise<{ data: string; mime: string }
   const { w, h, dpr } = await page.evaluate(() => ({ w: innerWidth, h: innerHeight, dpr: devicePixelRatio || 1 }));
   const scale = Math.min(1, 1280 / (Math.max(w, h, 1) * dpr));
   const format = process.env.INTENT_BROWSER_SHOT_FORMAT === "jpeg" ? "jpeg" : "png";
-  const data = (await page.screenshot({
-    type: format,
-    ...(format === "jpeg" ? { quality: 55 } : {}),
-    encoding: "base64",
-    clip: { x: 0, y: 0, width: w, height: h, scale },
-  })) as string;
+  const data = await capture(page, { format, ...(format === "jpeg" ? { quality: 55 } : {}), clip: { x: 0, y: 0, width: w, height: h, scale } });
   return { data, mime: `image/${format}` };
 }

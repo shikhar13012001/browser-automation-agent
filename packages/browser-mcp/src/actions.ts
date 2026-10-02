@@ -178,7 +178,44 @@ async function realClick(page: Page, handle: ElementHandle<Element>, id: number)
   }
   const cover = await coveredBy(handle);
   if (cover) throw new RetryableError(`[${id}] is covered by ${JSON.stringify(cover)} -- close/accept that first.`);
-  await withNavigation(page, () => handle.click());
+  await withNavigation(page, async () => {
+    if (!(await clickInOwnProcess(page, handle))) await handle.click();
+  });
+}
+
+type RawSession = { send(method: string, params: object): Promise<unknown> };
+
+// An element in a cross-origin iframe lives in another renderer process. puppeteer clicks at page
+// coordinates and Chrome routes the event into that process by hit-testing the displayed surface --
+// which a tab that isn't the selected one doesn't have, so in a parallel worker's tab the click was
+// reported done and never arrived (typing did, since keys follow focus). Such elements are clicked
+// through their own frame's session instead, in that frame's coordinates. Returns false for
+// ordinary elements, which keep the normal path.
+async function clickInOwnProcess(page: Page, handle: ElementHandle<Element>): Promise<boolean> {
+  const own = (handle.frame as unknown as { client?: RawSession }).client;
+  const main = (page.mainFrame() as unknown as { client?: RawSession }).client;
+  if (!own || !main || own === main) return false;
+  const pt = await handle.evaluate((el) => {
+    el.scrollIntoView({ block: "center", inline: "center" });
+    const r = el.getBoundingClientRect();
+    let x = r.left + r.width / 2;
+    let y = r.top + r.height / 2;
+    // Same-process frames nested inside this process's root frame: add their offsets.
+    try {
+      for (let w: Window = window; w.frameElement; w = w.parent) {
+        const fr = w.frameElement.getBoundingClientRect();
+        x += fr.left;
+        y += fr.top;
+      }
+    } catch {
+      // crossed into another origin: this is the process root
+    }
+    return { x, y };
+  });
+  await own.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pt.x, y: pt.y, button: "none", buttons: 0 });
+  await own.send("Input.dispatchMouseEvent", { type: "mousePressed", x: pt.x, y: pt.y, button: "left", buttons: 1, clickCount: 1 });
+  await own.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: pt.x, y: pt.y, button: "left", buttons: 0, clickCount: 1 });
+  return true;
 }
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
@@ -345,6 +382,10 @@ async function doFill(page: Page, id: number, value: string): Promise<string> {
   }
   if (i.tag === "select") return doSelect(page, id, value);
   if (await handle.evaluate((el, sel) => !!el.closest(sel), EDITOR_SEL)) return doFillCode(page, handle, id, value);
+  // Autocomplete fields (city, school, company pickers) usually only accept a value chosen from
+  // their suggestions: text that is merely typed fails validation with the field looking filled.
+  // Models reach for fill here as often as select, so fill does what was meant.
+  if (value && i.tag === "input" && (i.role === "combobox" || i.hasList || i.autocomplete)) return doSelect(page, id, value, true);
   const fillable =
     i.tag === "textarea" || i.editable || (i.tag === "input" && TEXT_INPUT_TYPES.includes(i.type)) ||
     ["textbox", "searchbox", "combobox", "spinbutton"].includes(i.role);
@@ -364,21 +405,25 @@ async function visibleOptions(frame: Frame): Promise<ElementHandle<Element>[]> {
   const all = await frame.$$(
     '[role=option],[role=listbox] li,[role=menuitemradio],[role=menuitem],[class*="option" i]:not(option):not(select)',
   );
-  const keep: ElementHandle<Element>[] = [];
-  for (const h of all) {
-    const ok = await h
-      .evaluate((el) => {
-        const r = el.getBoundingClientRect();
-        const t = ((el as HTMLElement).innerText || "").trim();
-        return r.width > 1 && r.height > 1 && t.length > 0 && t.length < 120 && !el.querySelector('[role=option]');
-      })
-      .catch(() => false);
-    if (ok) keep.push(h);
-  }
-  return keep;
+  // Checked concurrently: one round trip per option, one after another, took about a second on a
+  // 300-item country list.
+  const oks = await Promise.all(
+    all.map((h) =>
+      h
+        .evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          const t = ((el as HTMLElement).innerText || "").trim();
+          return r.width > 1 && r.height > 1 && t.length > 0 && t.length < 120 && !el.querySelector("[role=option]");
+        })
+        .catch(() => false),
+    ),
+  );
+  return all.filter((_, i) => oks[i]);
 }
 
-async function doSelect(page: Page, id: number, value: string): Promise<string> {
+// fromFill: called for fill on an autocomplete input. The text is typed either way; a matching
+// suggestion is picked if one shows up, and the typed text is simply kept if none does.
+async function doSelect(page: Page, id: number, value: string, fromFill = false): Promise<string> {
   const { handle, frame } = await resolve(id);
   const i = await info(handle);
   if (i.tag === "select") {
@@ -408,17 +453,34 @@ async function doSelect(page: Page, id: number, value: string): Promise<string> 
   const opensList = i.role === "combobox" || i.role === "listbox" || i.hasPopup || (i.tag === "input" && (i.hasList || i.autocomplete));
   if (!opensList) throw wrongKind(id, "select from", i, "use click for a button, or the id of the dropdown");
   const typable = i.tag === "input" || i.tag === "textarea" || i.editable;
+  // select matches loosely (the model asked to choose something like this). fill must not: on a
+  // search box a loosely matching suggestion would run a different search, so it only takes the
+  // suggestion that is exactly what was typed, or the single one that starts with it.
+  const pick = (labels: string[]): number => {
+    if (!fromFill) return bestOptionIndex(labels.map((t) => ({ label: t })), value);
+    const want = value.trim().toLowerCase();
+    const low = labels.map((t) => t.trim().toLowerCase());
+    const exact = low.indexOf(want);
+    if (exact >= 0) return exact;
+    const starts = low.map((t, n) => (t.startsWith(want) ? n : -1)).filter((n) => n >= 0);
+    return starts.length === 1 ? starts[0] : -1;
+  };
   await realClick(page, handle, id);
   if (typable) await clearAndType(page, handle, value);
   let texts: string[] = [];
   let opts: ElementHandle<Element>[] = [];
-  for (let waited = 0; waited <= 2500; waited += 100) {
+  for (let waited = 0; waited <= (fromFill ? 1200 : 2500); waited += 100) {
     if (waited) await new Promise((r) => setTimeout(r, 100));
     opts = await visibleOptions(frame);
     texts = await Promise.all(opts.map((o) => o.evaluate((el) => ((el as HTMLElement).innerText || "").replace(/\s+/g, " ").trim())));
-    if (bestOptionIndex(texts.map((t) => ({ label: t })), value) >= 0) break;
+    if (pick(texts) >= 0) break;
   }
-  const idx = bestOptionIndex(texts.map((t) => ({ label: t })), value);
+  const idx = pick(texts);
+  if (idx < 0 && fromFill) {
+    const got = await readValue(handle);
+    const seen = texts.length ? `; suggestions shown: ${texts.slice(0, 8).join(" | ")}` : "";
+    return `filled [${id}] (typed ${JSON.stringify(got.slice(0, 60))}; no suggestion matched to pick${seen})`;
+  }
   if (idx < 0) {
     const shown = texts.slice(0, 15).join(" | ");
     throw new Error(
@@ -600,25 +662,35 @@ async function runOne(page: Page, a: Action): Promise<string> {
       // Not on the page yet: it may be further down an infinite list or a lazy-loaded page. Scroll
       // every scrollable area to its end (that's what triggers loading) and look again.
       let scrolled = 0;
-      while (!info && scrolled < 6) {
-        const moved = await page.evaluate(() => {
+      while (!info && scrolled < 8) {
+        // Scrolls every scrollable area that isn't at its end, and returns their total height so
+        // growth (new items loaded) can be told apart from "nothing more to load".
+        const step = await page.evaluate(() => {
           let any = false;
+          let height = 0;
           const boxes = [document.scrollingElement ?? document.documentElement, ...Array.from(document.querySelectorAll("*")).filter((e) => {
             const s = getComputedStyle(e);
             return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 2;
           })];
           for (const b of boxes) {
+            height += b.scrollHeight;
             if (b.scrollTop + b.clientHeight < b.scrollHeight - 4) {
               b.scrollTop = b.scrollHeight;
               any = true;
             }
           }
-          return any;
+          return { any, height };
         });
-        if (!moved) break;
-        scrolled++;
-        await new Promise((res) => setTimeout(res, 700));
-        ({ found, info } = await search());
+        if (step.any) scrolled++;
+        // Wait for the text, or for the lists to grow, instead of a fixed pause: a lazy list fed by
+        // the network can take well over half a second, and giving up early looked like "not found".
+        let grew = false;
+        for (let waited = 0; waited < 2000 && !info && !grew; waited += 200) {
+          await new Promise((res) => setTimeout(res, 200));
+          ({ found, info } = await search());
+          if (!info) grew = (await page.evaluate("[document.scrollingElement||document.documentElement].concat(Array.from(document.querySelectorAll('*')).filter(function(e){var s=getComputedStyle(e);return /(auto|scroll)/.test(s.overflowY)&&e.scrollHeight>e.clientHeight+2})).reduce(function(n,b){return n+b.scrollHeight},0)")) as number > step.height;
+        }
+        if (!info && !grew && !step.any) break;
       }
       if (!info) throw new Error(`no visible element with the text ${JSON.stringify(text)}${scrolled ? ` (scrolled to the end of every list ${scrolled} times)` : ""}`);
       const el = (await found.evaluateHandle((r) => (r as { el: Element }).el)).asElement() as ElementHandle<Element>;
@@ -722,5 +794,12 @@ export async function act(rawActions: Record<string, unknown>[]): Promise<string
   }
   page = await settle(page);
   await saveScreenshot(page);
+  // In a 25-action batch one ERR line is easy to miss, and a missed one is a task reported done
+  // that isn't. Say it first.
+  const failed = lines.filter((l) => l.startsWith("ERR ")).length;
+  const skipped = lines.some((l) => l.startsWith("--  "));
+  if (failed || skipped) {
+    lines.unshift(`!! NOT ALL DONE: ${failed} action${failed === 1 ? "" : "s"} failed${skipped ? " and the rest of the batch was skipped" : ""} -- fix the ERR/-- lines below before moving on.`);
+  }
   return lines.join("\n");
 }

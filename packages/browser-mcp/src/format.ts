@@ -233,3 +233,64 @@ export function bestOptionIndex(options: { label: string; value?: string }[], wa
   });
   return bestScore > 0 ? best : -1;
 }
+
+const ITEM_LINE = /^\s*\[(\d+)\] /;
+
+function itemLines(state: string): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const line of state.split("\n")) {
+    const id = line.match(ITEM_LINE)?.[1];
+    if (id) m.set(id, line.trim());
+  }
+  return m;
+}
+
+// What changed between the state the model last saw and the current one, for the same page. A form
+// page is 1-4k tokens and was re-sent after every action; most of it never changes. Returns the full
+// state when a diff would mislead or not help: a different page, a dialog opening or closing, a small
+// page, or most of the page changed.
+export function diffState(prev: string | undefined, next: string): string {
+  if (!prev) return next;
+  const prevLines = prev.split("\n");
+  const lines = next.split("\n");
+  if (prevLines[0] !== lines[0]) return next;
+  const dialogOf = (ls: string[]) => ls.find((l) => l.startsWith("DIALOG ")) ?? "";
+  if (dialogOf(prevLines) !== dialogOf(lines)) return next;
+
+  const before = itemLines(prev);
+  const now = itemLines(next);
+  if (now.size < 8) return next;
+  const prevOther = new Set(prevLines.filter((l) => !ITEM_LINE.test(l)));
+
+  const out: string[] = [];
+  let section = "";
+  let group = "";
+  let changed = 0;
+  for (const line of lines) {
+    const id = line.match(ITEM_LINE)?.[1];
+    if (id) {
+      if (before.get(id) === line.trim()) continue;
+      changed++;
+      if (section) out.push(section);
+      if (group) out.push(group);
+      section = group = "";
+      out.push(line);
+    } else if (line.startsWith("## ")) {
+      section = line;
+      group = "";
+    } else if (line.startsWith("? ")) {
+      group = line;
+    } else if (/^(PAGE|TAB|DIALOG|ERRORS|MESSAGES|POPUP) /.test(line) || line.startsWith("POPUP")) {
+      out.push(line);
+    } else if (!prevOther.has(line)) {
+      out.push(line); // a note, HEADINGS or TEXT line that wasn't there before
+    }
+  }
+  if (changed > 0.6 * now.size) return next;
+
+  const gone = [...before.keys()].filter((id) => !now.has(id));
+  if (!changed && !gone.length) out.push("(no visible change on the page)");
+  if (gone.length) out.push(gone.length <= 30 ? `GONE: ${gone.map((g) => `[${g}]`).join(" ")}` : `GONE: ${gone.length} elements`);
+  out.push(`(only changes are listed; the other ${now.size - changed} elements are unchanged and their ids are still valid -- call state for the full list)`);
+  return out.join("\n");
+}

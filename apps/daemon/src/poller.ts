@@ -78,8 +78,8 @@ function postEvent(taskId: string, kind: RunEventKind, message: string): void {
 // genuinely stuck (see opencode.jsonc's browser agent prompt). Detection is done in markers.ts, not
 // left to the model to "remember to call a tool" -- deterministic and daemon-owned.
 
-async function uploadScreenshot(taskId: string, taskStartedAt: number): Promise<string | undefined> {
-  const path = await findLatestScreenshot(taskStartedAt);
+async function uploadScreenshot(taskId: string, taskStartedAt: number, worker: string): Promise<string | undefined> {
+  const path = await findLatestScreenshot(taskStartedAt, worker);
   if (!path) return undefined;
   try {
     const bytes = await readFile(path);
@@ -98,7 +98,8 @@ async function uploadScreenshot(taskId: string, taskStartedAt: number): Promise<
 
 let chromeOutage = false;
 
-async function pollOnce(): Promise<void> {
+// Claims the next queued task, or returns undefined when there is none (or the browser is down).
+async function claim(): Promise<CloudTask | undefined> {
   // Don't claim a task the browser can't run: while Chrome is down (and can't be restarted) tasks
   // stay queued instead of each failing, and the user is told once per outage.
   try {
@@ -111,18 +112,21 @@ async function pollOnce(): Promise<void> {
       console.error(`[poller] not taking tasks: ${message}`);
       await sendAttentionEmail({ taskId: "-", prompt: "Browser unavailable", description: `${message}\nQueued tasks will wait until Chrome is back.`, taskStartedAt: Date.now(), kind: "Paused" });
     }
-    return;
+    return undefined;
   }
   const res = await fetch(`${CLOUD_API_URL}/api/tasks/next?device=${DEVICE_ID}`, { headers: authHeaders() });
-  if (res.status === 204) return;
+  if (res.status === 204) return undefined;
   if (!res.ok) {
     console.error(`poll failed: ${res.status}`);
-    return;
+    return undefined;
   }
+  return (await res.json()) as CloudTask;
+}
 
-  const task = (await res.json()) as CloudTask;
+// Runs one claimed task on the given worker (its own browser tab) and reports the outcome.
+async function runClaimed(task: CloudTask, worker: string): Promise<void> {
   console.log(
-    `[poller] running task ${task.id}${task.sessionId ? ` (continuing session ${task.sessionId})` : ""}: ${task.prompt}`,
+    `[poller] running task ${task.id}${worker ? ` on ${worker}` : ""}${task.sessionId ? ` (continuing session ${task.sessionId})` : ""}: ${task.prompt}`,
   );
 
   const taskStartedAt = Date.now();
@@ -140,7 +144,7 @@ async function pollOnce(): Promise<void> {
       task.sessionId,
       (kind, message) => postEvent(task.id, kind, message),
       task.attachments ?? [],
-      { includeContext: task.mode !== "qa" },
+      { includeContext: task.mode !== "qa", worker },
     );
     output = result.output;
     sessionId = result.sessionId;
@@ -153,7 +157,7 @@ async function pollOnce(): Promise<void> {
       console.error(`[poller] also failed to report failure for ${task.id}`, reportErr),
     );
     // Unattended runs: a failure is as worth knowing about as a block.
-    await sendAttentionEmail({ taskId: task.id, prompt: task.prompt, description: `The task failed: ${message}`, dashboardUrl: `${CLOUD_API_URL}/`, taskStartedAt, kind: "Failed" });
+    await sendAttentionEmail({ taskId: task.id, prompt: task.prompt, description: `The task failed: ${message}`, dashboardUrl: `${CLOUD_API_URL}/`, taskStartedAt, kind: "Failed", worker });
     return;
   }
 
@@ -165,11 +169,11 @@ async function pollOnce(): Promise<void> {
 
   try {
     if (approvalDescription) {
-      const screenshotUrl = await uploadScreenshot(task.id, taskStartedAt);
+      const screenshotUrl = await uploadScreenshot(task.id, taskStartedAt, worker);
       await reportResult(task.id, "awaiting_approval", output, sessionId, { ...base, attentionScreenshotUrl: screenshotUrl });
       console.log(`[poller] task ${task.id} awaiting approval: ${approvalDescription}`);
     } else if (attentionDescription) {
-      const screenshotUrl = await uploadScreenshot(task.id, taskStartedAt);
+      const screenshotUrl = await uploadScreenshot(task.id, taskStartedAt, worker);
       await reportResult(task.id, "needs_attention", output, sessionId, { ...base, attentionScreenshotUrl: screenshotUrl });
       console.log(`[poller] task ${task.id} needs attention: ${attentionDescription}`);
       await sendAttentionEmail({
@@ -178,6 +182,7 @@ async function pollOnce(): Promise<void> {
         description: attentionDescription,
         dashboardUrl: `${CLOUD_API_URL}/`,
         taskStartedAt,
+        worker,
       });
     } else {
       await reportResult(task.id, "completed", output, sessionId, base);
@@ -206,16 +211,43 @@ async function failOrphanedTasks(): Promise<void> {
   }
 }
 
+// How many tasks run at once, each in its own tab of the same Chrome. The first worker keeps the
+// unnamed default tab, so a single-worker daemon behaves exactly as before.
+const CONCURRENCY = Math.max(1, Number(process.env.INTENT_AGENT_CONCURRENCY ?? 1));
+
 export function startPolling(): void {
-  console.log(`[poller] polling ${CLOUD_API_URL} as device "${DEVICE_ID}" every ${POLL_INTERVAL_MS}ms`);
+  console.log(`[poller] polling ${CLOUD_API_URL} as device "${DEVICE_ID}" every ${POLL_INTERVAL_MS}ms, ${CONCURRENCY} worker${CONCURRENCY === 1 ? "" : "s"}`);
   void failOrphanedTasks();
-  // Self-scheduling, not setInterval: a task can run far longer than POLL_INTERVAL_MS, and
-  // setInterval would fire a new overlapping pollOnce() every tick regardless, hammering the
-  // cloud API with concurrent requests for the entire duration of every long-running task.
-  const tick = () => {
-    pollOnce()
-      .catch((err) => console.error("[poller] error", err))
-      .finally(() => setTimeout(tick, POLL_INTERVAL_MS));
+  const free = Array.from({ length: CONCURRENCY }, (_, n) => (n === 0 ? "" : `w${n + 1}`));
+  let wake: () => void = () => {};
+  // One dispatcher, not one poll loop per worker: it claims a task, hands it to a free worker and
+  // polls again at once (a batch no longer idles POLL_INTERVAL_MS between tasks), and only waits when
+  // the queue is empty or every worker is busy. Idle polling stays at one request per interval
+  // however many workers there are.
+  const dispatch = async () => {
+    for (;;) {
+      if (!free.length) {
+        await new Promise<void>((r) => (wake = r));
+        continue;
+      }
+      let task: CloudTask | undefined;
+      try {
+        task = await claim();
+      } catch (err) {
+        console.error("[poller] error", err);
+      }
+      if (!task) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        continue;
+      }
+      const worker = free.shift()!;
+      void runClaimed(task, worker)
+        .catch((err) => console.error("[poller] error", err))
+        .finally(() => {
+          free.push(worker);
+          wake();
+        });
+    }
   };
-  tick();
+  void dispatch();
 }

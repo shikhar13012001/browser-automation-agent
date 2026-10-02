@@ -20,9 +20,10 @@ The animation above is a screen recording, shown at 3x speed, of the agent runni
 | **Your real, logged-in Chrome** | Tasks run in a Chrome you already use, so sites that need your sessions and cookies work without handing credentials to a third party. |
 | **Semantic page tree** | The model sees only what a user can act on: `[12] combobox "Country" = "India" *`. That is about 1–3k tokens per page instead of a 20–80k accessibility dump. See [How the browser tool works](#how-the-browser-tool-works). |
 | **One call per page** | The model fills a whole form step in one `act` call (every field plus the Next click), so a 3-step application takes about 5 tool calls. |
-| **Works on modern widgets** | Radix/MUI/React-Select dropdowns, date pickers, shadow DOM, cross-origin iframes, rich-text boxes, hover menus, infinite lists and code editors (Monaco, CodeMirror, Ace). There are 28 patterns in a [test fixture](#robustness-test-widget-zoo). |
+| **Works on modern widgets** | Radix/MUI/React-Select dropdowns, date pickers, shadow DOM, cross-origin iframes, rich-text boxes, hover menus, infinite lists and code editors (Monaco, CodeMirror, Ace). There are 29 patterns in a [test fixture](#robustness-test-widget-zoo). |
 | **Vision only when needed** | A `look` tool sends one screenshot to a vision model when the tree can't answer (canvas, image-only UI) and returns coordinates to click. |
-| **Activity trail** | Every run records status, tool actions, findings, and the final answer. While it runs, the dashboard shows the agent's latest step. |
+| **Live activity trail** | Every run records status, tool actions, findings, and the final answer. With an OpenAI model, each step appears on the dashboard as it happens. |
+| **Parallel workers** | `INTENT_AGENT_CONCURRENCY=N` runs N tasks at once, each in its own tab: 3.8× throughput with 5 workers in the benchmark. |
 | **File attachments** | Attach files to a task, and the agent can upload local files (such as a resume) into web forms. Uploads are restricted to allowed folders. |
 | **Follow-up in the same session** | Continue a finished task and the agent keeps its earlier context instead of starting cold. |
 | **Approval gate** | Tick "Ask before the final submit" and the agent does all the preparation, stops one step before the irreversible action, and waits. Approve or reject from the dashboard and it resumes in the same session. |
@@ -62,7 +63,7 @@ Use Intent Agent when:
 
 Reach for something else when:
 
-- You need high-volume or scheduled scraping. Tasks run one at a time per machine, so a purpose-built scraper or API will be faster and cheaper.
+- You need high-volume or scheduled scraping. A few tasks can run in parallel, but each one is a model-driven browser session, so a purpose-built scraper or API will be faster and cheaper.
 - A site offers an official API. An API is more reliable than driving a page.
 - The action is irreversible and you have not reviewed it. The agent is designed to stop short, but you should still read what it did.
 - Several people need separate accounts and permissions. Access is a single shared secret.
@@ -75,7 +76,7 @@ Reach for something else when:
 flowchart LR
   U[Dashboard] -->|create task| DB[(Neon Postgres)]
   D[Local daemon] -->|poll and claim| DB
-  D --> SDK[OpenCode SDK]
+  D --> SDK[Model loop: direct or OpenCode]
   SDK --> A[Browser agent]
   A --> MCP[intent-browser MCP]
   MCP -->|CDP via puppeteer-core| C[Debug Chrome]
@@ -85,7 +86,7 @@ flowchart LR
 
 1. You submit a task in the dashboard. It is stored as `queued`.
 2. The daemon polls `/api/tasks/next`, which claims one task atomically (`FOR UPDATE SKIP LOCKED`), so several daemons never take the same task.
-3. The daemon starts an OpenCode session with the `browser` agent (prompt and tools in `opencode.jsonc`), prepends your `context/` files, and sends the task.
+3. The daemon starts a session with the `browser` agent (prompt and limits in `opencode.jsonc`), prepends your `context/` files, and sends the task. OpenAI models run in the daemon's own model loop; other providers run through OpenCode (see [Engines](#engines)).
 4. The agent calls intent-browser tools: `open`, `state`, `act`, `tabs`, `look`. The MCP server talks to Chrome over the DevTools Protocol on port 9222.
 5. The daemon reads the whole turn back (every tool call and reasoning step, plus token usage and cost), classifies the ending, and reports it. The ending is one of: completed, `NEEDS_ATTENTION:`, awaiting approval, or failed.
 
@@ -156,14 +157,15 @@ All numbers below come from the scripts in `bench/`, run through the daemon's ow
 
 | Config | Result | Time | Tool calls | Cost |
 | --- | --- | --- | --- | --- |
-| **intent-browser + gpt-6-luna (low)** | **18/18, submitted** | **42–75s** | 9–15 | **$0.002–0.004** |
-| intent-browser + gpt-6-luna (none / medium) | 18/18, submitted | 58–63s | 9–11 | $0.002–0.003 |
+| **intent-browser + gpt-6-luna (low), direct engine** | **18/18, submitted (6 of 6 runs)** | **20–26s** | 7 | **$0.001** |
+| intent-browser + gpt-6-luna (low), through OpenCode | 18/18, submitted | 42–75s | 9–15 | $0.002–0.004 |
+| intent-browser + gpt-6-luna (none / medium), through OpenCode | 18/18, submitted | 58–63s | 9–11 | $0.002–0.003 |
 | intent-browser + gpt-5.4-mini | 18/18, submitted | 88s | 17 | $0.030 |
 | intent-browser + gpt-4o-mini | not submitted | 276s (hit the step cap) | 59 | $0.078 |
 | intent-browser + gpt-4.1-mini / gpt-5-mini / gpt-5.4-nano | not submitted | 57–83s | 11–15 | $0.008–0.016 |
 | chrome-devtools-mcp + gpt-4o-mini (previous tool) | not submitted | 92s | 14 | $0.013 |
 
-`gpt-6-luna` is the default: it is the only model that finished every run, and it is also among the cheapest. Reasoning effort made no measurable difference.
+`gpt-6-luna` is the default: it is the only model that finished every run, and it is also among the cheapest. Reasoning effort made no measurable difference. The rows other than the first were measured through OpenCode, before the direct engine existed.
 
 ### Speed work (complex task)
 
@@ -173,18 +175,53 @@ All numbers below come from the scripts in `bench/`, run through the daemon's ow
 | --- | --- | --- | --- |
 | Starting point | 215–344s | 28–45 | $0.011–0.020 |
 | React-Select value shown in the state; `click_text` scrolls lazy lists; "trust the state" prompt | 111–122s | 13–16 | $0.005 |
-| Label-targeted actions (reveal and fill in one call); calendar driven by `fill`; `click_text` matches `aria-label` | **68–91s** | **6–9** | **$0.003** |
+| Label-targeted actions (reveal and fill in one call); calendar driven by `fill`; `click_text` matches `aria-label` | 68–91s | 6–9 | $0.003 |
+| Direct engine (the daemon runs the model loop itself, no OpenCode) | **28–41s** | **3–6** | **$0.001–0.002** |
 
-All runs scored 25/25. What the traces showed:
+All of these runs scored 25/25. What the traces showed:
 
 - **Model steps dominate.** Each model step takes about 3–5s, while browser work for the whole task is under 25s. The changes above cut the steps, mostly by removing retries caused by the tool under-reporting what had worked.
 - **Covered Chrome windows stall every action.** When another app covers Chrome, Chrome stops rendering the page (`visibilityState: hidden`, no `requestAnimationFrame`). Puppeteer's `click()` waits on an IntersectionObserver, so every click hung until the 60s CDP timeout. intent-browser now enables focus emulation on every tab it works in, and Chrome is launched with the anti-throttling flags.
 - **Extensions cost about 1.5s per navigation.** With a copied everyday profile (about 30 extensions), the median navigation took 1,602ms, against 87–145ms without extensions. The launcher now uses `--disable-extensions`; logins still work because they live in cookies.
 - **Waiting for "network idle" was waiting on analytics.** Settling now only counts document, XHR/fetch, script and stylesheet requests, and ignores anything open longer than 1.5s.
 
+### Engines
+
+For OpenAI models the daemon runs the model loop itself (`apps/daemon/src/direct.ts`) against the Responses API and calls intent-browser over MCP. Other providers, and follow-ups to sessions that started in OpenCode, still go through OpenCode. On the same complex task and model:
+
+| | Direct engine | Through OpenCode |
+| --- | --- | --- |
+| Time | 28–41s | 86–105s |
+| Output tokens | about 1,000 | about 3,300 |
+| Cost | $0.001–0.002 | $0.003–0.004 |
+| Steps on the dashboard | Each one as it happens | After the run finishes |
+| Tool start-up | Once, about 3s, kept alive between tasks | Per server start |
+
+Two things only showed up once the loop was ours. The model has no clock, so the engine tells it today's date (without it, "the 15th of next month" was booked in July during October). And after a long batch the model sometimes reported items done that had failed, so a failed or skipped action is now announced on the first line of the result, and the prompt requires a final check of every requested item.
+
+State diffs after each action were built and measured, then left off by default (`INTENT_BROWSER_DIFF=1` enables them). They saved no time, because cached input is nearly free, and cost accuracy: 4 of 6 runs were perfect with diffs against 6 of 6 without, because the full state is what the model checks its work against.
+
+### Parallel workers
+
+`INTENT_AGENT_CONCURRENCY=N` runs N tasks at once, each in its own tab of the same Chrome with its own tool process. `bench/parallel.ts` runs N copies of the complex task together:
+
+| Workers | Wall clock | Task time | Throughput | All 25 checks passed |
+| --- | --- | --- | --- | --- |
+| 1 | 28–41s | 28–41s | 1× | 4 of 4 runs |
+| 3 | 56s | 133s | 2.4× | 3 of 3 tasks |
+| 5 | 59s | 225s | 3.8× | 5 of 5 tasks |
+
+Getting background tabs to behave like the selected one took three fixes, each found with the deterministic zoo test run concurrently:
+
+- **Focus emulation per frame.** A cross-origin iframe has its own renderer process and session, which the page's focus emulation doesn't reach.
+- **Clicks sent to the frame's own session.** Chrome routes a page-level click into a cross-origin frame by hit-testing the displayed surface, which a background tab doesn't have. The click was reported done and never arrived.
+- **Screenshots through CDP.** Puppeteer's `page.screenshot()` activates the tab first, so workers kept stealing the foreground from each other.
+
+Limits: workers share one Chrome profile, so they share logins and cookies. Several tasks against the same site from one account can trip rate limits or bot detection. Tasks on the OpenCode engine still run one at a time. Background tabs run slower than the selected tab: a 25-action batch took 12s in the selected tab and 20–29s in the others, and starting Chrome with the anti-throttling flags did not measurably change that. Parallel runs were verified on one long-running Chrome; on a freshly started second Chrome, a few runs lost an input (an Enter key press, an iframe field) for reasons not yet traced, so concurrency stays opt-in.
+
 ### Robustness test (widget zoo)
 
-`bench/zoo-test.ts` drives 28 widget patterns through the tool layer with no model, so a failure is always a tool bug. It currently passes 28/28 in about 40s. The patterns include:
+`bench/zoo-test.ts` drives 29 widget patterns through the tool layer with no model, so a failure is always a tool bug. It currently passes 29/29 in about 40s, in the selected tab and in background worker tabs. The patterns include:
 
 - Radix, MUI and React-Select dropdowns
 - a read-only date picker
@@ -193,7 +230,7 @@ All runs scored 25/25. What the traces showed:
 - a CSS hover menu and an infinite list
 - slow content, a toast and `confirm()`
 - a disabled-until-checked button and a button under a fixed bar
-- a keyup-filtered autocomplete, an input mask and a range slider
+- a keyup-filtered autocomplete, `fill` on an autocomplete, an input mask and a range slider
 - toggle buttons, optgroups, an input re-rendered on every keystroke, Enter-to-search, icon-only buttons and radio cards
 
 ### Real sites
@@ -211,7 +248,7 @@ The daemon is built to be left alone with a queue:
 
 | Situation | What happens |
 | --- | --- |
-| Model or provider hangs (no browser activity) | Every intent-browser call writes a timestamp to `%TEMP%/intent-browser/activity.json`. After `INTENT_AGENT_STALL_MS` (default 3 min) with no activity, the session is aborted for real (`session.abort`), so it can't keep clicking in the background. |
+| Model or provider hangs | Direct engine: each model request has a 2-minute limit and is retried twice, then the next model takes over. OpenCode engine: every intent-browser call writes a timestamp to `%TEMP%/intent-browser/activity.json`; after `INTENT_AGENT_STALL_MS` (default 3 min) with no activity, the session is aborted for real (`session.abort`), so it can't keep clicking in the background. |
 | A long application that keeps making progress | Not interrupted. The only overall cap is `INTENT_AGENT_MAX_RUN_MS` (default 25 min). |
 | A model fails or stalls | The next model in `INTENT_AGENT_MODEL` continues in the same session. It is told to re-read the page and not to repeat anything irreversible (a submit, a sent message, a booking). |
 | The browser tool connection dies | The OpenCode server is restarted and the task continues once. |
@@ -284,6 +321,11 @@ Copy `apps/daemon/.env.example` to `apps/daemon/.env` (git-ignored); the daemon 
 | `OPENAI_API_KEY` | unset | For OpenAI models and the `look` vision tool |
 | `INTENT_AGENT_STALL_MS` | `180000` | Abort a run after this long with no browser activity |
 | `INTENT_AGENT_MAX_RUN_MS` | `1500000` | Hard cap for one run |
+| `INTENT_AGENT_CONCURRENCY` | `1` | Tasks run at once, each in its own tab (see [Parallel workers](#parallel-workers)) |
+| `INTENT_AGENT_ENGINE` | unset | `opencode` forces every model through OpenCode; by default OpenAI models use the direct engine |
+| `INTENT_AGENT_STEP_TIMEOUT_MS` | `120000` | Direct engine: time limit for one model request (retried twice) |
+| `INTENT_AGENT_PRICES` | built-in table | Direct engine: JSON of `{"model":[input, cached, output]}` USD per 1M tokens, for cost reporting |
+| `INTENT_BROWSER_DIFF` | unset | `1` returns only what changed after each `act` (off by default; see [Engines](#engines)) |
 | `INTENT_AGENT_CHROME_PROFILE` | unset | Profile the daemon uses to restart debug Chrome; unset disables auto-start |
 | `INTENT_AGENT_CHROME_PATH` | auto-detected | Chrome executable |
 | `INTENT_BROWSER_CDP_URL` | `http://127.0.0.1:9222` | Chrome DevTools endpoint |
@@ -345,12 +387,12 @@ queued -> running -> completed
                   -> awaiting_approval
 ```
 
-`awaiting_approval` means the agent prepared a final action and is waiting for you to approve or reject it. `needs_attention` is reserved for blockers such as CAPTCHA, OTP, login challenges, or missing user input; the daemon uploads the latest screenshot and sends an email. While a task runs, the daemon posts a status every 15 seconds with the agent's latest step. The full ordered trail of tool calls and reasoning is attached when the run ends, because OpenCode only exposes a message's parts once it is committed.
+`awaiting_approval` means the agent prepared a final action and is waiting for you to approve or reject it. `needs_attention` is reserved for blockers such as CAPTCHA, OTP, login challenges, or missing user input; the daemon uploads the latest screenshot and sends an email. On the direct engine, each tool call is posted to the dashboard as it starts. On the OpenCode engine, the daemon posts a status every 15 seconds with the agent's latest step and attaches the full ordered trail when the run ends, because OpenCode only exposes a message's parts once it is committed.
 
 ## Current limitations
 
 - QA findings are the model's observations, and research on AI web-testing agents reports many false positives. Reproduce each finding before filing it.
-- One task runs at a time per machine. A batch queues one task per row; more machines running the daemon work through a queue in parallel.
+- One task runs at a time unless `INTENT_AGENT_CONCURRENCY` is raised. Parallel workers share one Chrome profile, so they share logins, and several tasks on the same site from one account can trip rate limits.
 - Canvas-only UIs and image CAPTCHAs are beyond the semantic tree. The `look` fallback helps with the former; the latter end as `needs_attention` by design.
 - Closed shadow roots are invisible to page scripts, so elements inside them can only be reached through `look` and `click_at`.
 - Setup scripts assume Windows and a dedicated Chrome debug profile.
@@ -379,7 +421,9 @@ npm run lint -w apps/web; npm run build -w apps/web
 Browser tests need the fixture server (`node bench/fixture/server.mjs`) and debug Chrome on port 9222:
 
 ```powershell
-npx tsx bench/zoo-test.ts                    # 28 widget patterns through the tool layer, no model
+npx tsx bench/zoo-test.ts                    # 29 widget patterns through the tool layer, no model
 npx tsx bench/zoo-agent.ts openai/gpt-6-luna # one natural-language task across the zoo, scored
+npx tsx bench/parallel.ts 3                  # three of those at once, each in its own tab
+npx tsx bench/followup-test.ts               # direct engine: follow-up continues a session
 npx tsx bench/run.ts --only luna-low         # job-application benchmark (see Benchmarks)
 ```

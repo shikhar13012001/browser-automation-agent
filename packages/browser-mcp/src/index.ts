@@ -4,9 +4,10 @@ import { z } from "zod";
 import { act, VERBS } from "./actions.js";
 import { closeTab, getPage, listTabs, openUrl, readState, saveScreenshot, switchTab, takeNotes } from "./browser.js";
 import { look } from "./vision.js";
+import { diffState } from "./format.js";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { workerFile } from "./paths.js";
+import { dirname } from "node:path";
 
 // One browser, one agent: tool calls are serialised so parallel calls from the model can't
 // interleave clicks and reads on the same tab.
@@ -15,7 +16,7 @@ let lastBatch = "";
 let repeats = 0;
 // Per-call durations (INTENT_BROWSER_TIMINGS=1) so benchmarks can split a run into browser time and
 // model time.
-const TIMINGS = process.env.INTENT_BROWSER_TIMINGS === "1" ? join(tmpdir(), "intent-browser", "timings.jsonl") : "";
+const TIMINGS = process.env.INTENT_BROWSER_TIMINGS === "1" ? workerFile("timings.jsonl") : "";
 
 function serial<T>(work: () => Promise<T>): Promise<T> {
   const fn = async () => {
@@ -40,7 +41,7 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
 // The daemon can't see inside a running model turn, so every tool call leaves a timestamp and a
 // one-line summary here. The daemon uses it to tell a slow-but-working run from a stuck one, and to
 // show what the agent is doing right now.
-const ACTIVITY_FILE = join(tmpdir(), "intent-browser", "activity.json");
+const ACTIVITY_FILE = workerFile("activity.json");
 let lastSummary = "";
 function recordActivity(tool: string, summary: string): void {
   lastSummary = `${tool}: ${summary}`;
@@ -57,10 +58,21 @@ function text(s: string) {
   return { content: [{ type: "text" as const, text: s }] };
 }
 
-async function withState(prefix: string, opts: { all?: boolean; text?: boolean } = {}) {
+// The last full state the model was shown. With INTENT_BROWSER_DIFF=1, an act on the same page
+// returns only the difference. It is off by default: measured on the zoo task it saved no time
+// (cached input is nearly free) and cost accuracy -- 4 of 6 runs perfect with diffs against 6 of 6
+// without, because the full state after each act is what the model checks its work against. It is
+// kept for pages too large to resend.
+let seen: string | undefined;
+const DIFF = process.env.INTENT_BROWSER_DIFF === "1";
+
+async function withState(prefix: string, opts: { all?: boolean; text?: boolean; diff?: boolean } = {}) {
   const state = await readState(opts);
   const notes = takeNotes();
-  return text([prefix, ...notes.map((n) => `note: ${n}`), state].filter(Boolean).join("\n\n"));
+  const shown = opts.diff && DIFF ? diffState(seen, state) : state;
+  // Variants with extra content (all links, page text) aren't a baseline for later diffs.
+  seen = opts.all || opts.text ? undefined : state;
+  return text([prefix, ...notes.map((n) => `note: ${n}`), shown].filter(Boolean).join("\n\n"));
 }
 
 function fail(err: unknown) {
@@ -144,7 +156,7 @@ server.registerTool(
           );
         }
         const report = await act(actions as Record<string, unknown>[]);
-        return await withState(report);
+        return await withState(report, { diff: true });
       } catch (e) {
         return fail(e);
       }

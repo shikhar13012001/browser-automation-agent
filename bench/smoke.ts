@@ -36,7 +36,8 @@ s = await step("step 1", [
   { do: "fill", id: idOf(s, /"Email address/), value: "ishgupta2015@gmail.com" },
   { do: "select", id: idOf(s, /"Country code/), value: "+91 India" },
   { do: "fill", id: idOf(s, /"Phone number/), value: "9555607181" },
-  { do: "select", id: idOf(s, /combobox "City/), value: "Bengaluru" },
+  // fill, not select: the common model mistake on this field, which must still pick the suggestion.
+  { do: "fill", id: idOf(s, /combobox "City/), value: "Bengaluru" },
   { do: "fill", id: idOf(s, /"LinkedIn profile URL"/), value: "https://linkedin.com/in/shikhar-gupta-71ab59201" },
   { do: "click", id: idOf(s, /button "Next"/) },
 ]);

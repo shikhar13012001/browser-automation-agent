@@ -17,7 +17,7 @@ const RUN_TIMEOUT_MS = 8 * 60_000;
 type Config = { name: string; tool: "intent-browser" | "chrome-devtools"; model: string; effort?: string };
 
 const baseline = JSON.parse(readFileSync("bench/baseline-config.json", "utf8"));
-const intentBrowserMcp = { type: "local", command: ["npx", "tsx", "packages/browser-mcp/src/index.ts"] };
+const intentBrowserMcp = { type: "local", command: ["node", "--import", "tsx", "packages/browser-mcp/src/index.ts"] };
 
 function overrideFor(c: Config): Record<string, unknown> {
   const [, modelID] = c.model.split("/", 2);
@@ -80,6 +80,9 @@ function arg(name: string): string | undefined {
 
 const only = arg("only")?.split(",");
 const runs = Number(arg("runs") ?? 1);
+// --engine opencode|direct for the intent-browser configs (default: direct for OpenAI models). The
+// chrome-devtools baseline only exists inside OpenCode.
+const engineArg = arg("engine") as "opencode" | "direct" | undefined;
 const configs = only ? MATRIX.filter((c) => only.includes(c.name)) : MATRIX;
 mkdirSync("bench/results", { recursive: true });
 const outFile = `bench/results/run-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
@@ -88,10 +91,13 @@ const results: Record<string, unknown>[] = [];
 for (const c of configs) {
   for (let r = 1; r <= runs; r++) {
     setConfigOverride(overrideFor(c));
-    const mcp = (await warmUp()) as Record<string, { status: string }>;
-    const live = Object.entries(mcp ?? {}).filter(([, v]) => v?.status === "connected").map(([k]) => k);
-    if (!live.includes(c.tool)) {
-      console.log(`!! ${c.name}: expected ${c.tool} to be connected, got ${JSON.stringify(mcp)}`);
+    const engine = c.tool === "chrome-devtools" ? "opencode" : engineArg;
+    if (engine === "opencode") {
+      const mcp = (await warmUp()) as Record<string, { status: string }>;
+      const live = Object.entries(mcp ?? {}).filter(([, v]) => v?.status === "connected").map(([k]) => k);
+      if (!live.includes(c.tool)) {
+        console.log(`!! ${c.name}: expected ${c.tool} to be connected, got ${JSON.stringify(mcp)}`);
+      }
     }
     await fetch(`${BASE}/api/reset`);
 
@@ -102,7 +108,7 @@ for (const c of configs) {
     let usedModel = "";
     try {
       const res = await Promise.race([
-        runTask(PROMPT, undefined, () => {}, [], { models: [c.model] }),
+        runTask(PROMPT, undefined, () => {}, [], { models: [c.model], engine }),
         new Promise<never>((_, rej) => setTimeout(() => rej(new Error("benchmark timeout")), RUN_TIMEOUT_MS)),
       ]);
       output = res.output;
@@ -120,6 +126,7 @@ for (const c of configs) {
     const reportedRef = !!last?.ref && output.includes(last.ref);
     const row = {
       config: c.name,
+      engine: engine ?? "direct",
       tool: c.tool,
       model: c.model,
       effort: c.effort ?? "",

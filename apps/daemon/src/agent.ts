@@ -7,6 +7,9 @@ import { createOpencodeClient, createOpencodeServer, type OpencodeClient } from 
 import { Agent } from "undici";
 import type { Part, TextPartInput, FilePartInput } from "@opencode-ai/sdk";
 import { isRecoverableToolFailure, parseModelChain } from "./markers.js";
+import { setConfigLayer } from "./config.js";
+import { runDirect } from "./direct.js";
+import { closeBrowserTools } from "./tool-client.js";
 
 // process.cwd() is NOT a reliable default here: `npm run start -w apps/daemon` (and similar
 // workspace-script invocations) sets it to apps/daemon, not the repo root, silently breaking
@@ -54,6 +57,7 @@ let configOverride: Record<string, unknown> | undefined;
 // Takes effect on the next task, since the embedded server is recreated.
 export function setConfigOverride(config: Record<string, unknown> | undefined): void {
   configOverride = config;
+  setConfigLayer(config);
   resetClient();
 }
 
@@ -106,6 +110,7 @@ export function resetClient(): void {
   }
   client = undefined;
   server = undefined;
+  closeBrowserTools();
 }
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -151,7 +156,30 @@ export type RunOptions = {
   models?: string[];
   // Personal context is for acting as the user; QA runs test with persona data instead.
   includeContext?: boolean;
+  // Which browser tab/tool instance to use; tasks with different workers can run at the same time.
+  worker?: string;
+  // Force an engine. Default: "direct" for OpenAI models, "opencode" for everything else.
+  engine?: Engine;
 };
+
+export type Engine = "direct" | "opencode";
+
+function engineFor(model: string, options: RunOptions, sessionId: string | undefined): Engine {
+  const forced = options.engine ?? (process.env.INTENT_AGENT_ENGINE as Engine | undefined);
+  if (forced === "opencode") return "opencode";
+  // A follow-up continues where its session lives: OpenCode session ids can't be continued directly.
+  if (sessionId && !sessionId.startsWith("resp_")) return "opencode";
+  return model.startsWith("openai/") && process.env.OPENAI_API_KEY ? "direct" : "opencode";
+}
+
+// OpenCode shares one embedded server and one browser tab, so its runs are taken one at a time even
+// when the daemon runs several workers.
+let opencodeQueue: Promise<unknown> = Promise.resolve();
+function opencodeTurn<T>(fn: () => Promise<T>): Promise<T> {
+  const run = opencodeQueue.then(fn, fn);
+  opencodeQueue = run.catch(() => {});
+  return run;
+}
 
 export type RunResult = {
   output: string;
@@ -259,10 +287,20 @@ export async function runTask(
       // A retry or fallback continues in the same session, so the next model sees what was already
       // done. Starting over from the original prompt could repeat an irreversible step (submit the
       // application a second time) that the interrupted attempt had already taken.
-      const text = interrupted && attempt.sessionId ? resumePrompt(interrupted, prompt) : prompt;
-      if (interrupted && attempt.sessionId) await waitIdle(attempt.sessionId);
+      const engine = engineFor(model, options, attempt.sessionId);
+      // A conversation stored by the direct engine can't be handed to OpenCode: start a new session
+      // there, with the resume note telling the model to check the page first.
+      if (engine === "opencode" && attempt.sessionId?.startsWith("resp_")) attempt.sessionId = undefined;
+      const text = interrupted ? resumePrompt(interrupted, prompt) : prompt;
       try {
-        const result = await runOnce(model, text, attempt, onEvent, interrupted ? [] : attachments, includeContext);
+        const files = interrupted ? [] : attachments;
+        const result =
+          engine === "direct"
+            ? await runDirect(model, await withContext(text, !attempt.sessionId && includeContext), attempt, onEvent, files, options.worker ?? "")
+            : await opencodeTurn(async () => {
+                if (interrupted && attempt.sessionId) await waitIdle(attempt.sessionId);
+                return runOnce(model, text, attempt, onEvent, files, includeContext);
+              });
         if (!recovered && isRecoverableToolFailure(result.toolErrors)) {
           recovered = true;
           interrupted = "the browser tool connection was lost";
@@ -294,7 +332,14 @@ export async function runTask(
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-type Attempt = { sessionId?: string };
+// sessionId: an OpenCode session id, or (direct engine) the id of the last model response.
+// pending: direct-engine tool calls the stored conversation is still waiting on.
+export type Attempt = { sessionId?: string; pending?: string[] };
+
+async function withContext(prompt: string, include: boolean): Promise<string> {
+  const context = include ? await loadContext() : "";
+  return context ? `<context about the user, read before acting -- use this instead of guessing or asking>\n${context}\n</context>\n\n${prompt}` : prompt;
+}
 
 function resumePrompt(reason: string, original: string): string {
   return (
@@ -348,10 +393,7 @@ async function runOnce(
   }
   const sessionId = attempt.sessionId;
 
-  const context = isNewSession && includeContext ? await loadContext() : "";
-  const promptText = context
-    ? `<context about the user, read before acting -- use this instead of guessing or asking>\n${context}\n</context>\n\n${prompt}`
-    : prompt;
+  const promptText = await withContext(prompt, isNewSession && includeContext);
 
   const turnStartedAt = Date.now();
   // Watchdog + heartbeat. A rate-limited or exhausted provider can hang forever without erroring

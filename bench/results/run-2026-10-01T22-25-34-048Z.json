@@ -1,0 +1,26 @@
+[
+  {
+    "config": "luna-low",
+    "engine": "direct",
+    "tool": "intent-browser",
+    "model": "openai/gpt-6-luna",
+    "effort": "low",
+    "run": 1,
+    "submitted": true,
+    "fieldsCorrect": "18/18",
+    "success": true,
+    "reportedRef": true,
+    "wrongFields": [],
+    "seconds": 36,
+    "steps": 13,
+    "toolCalls": 12,
+    "freshInput": 2322,
+    "cachedInput": 108676,
+    "output": 849,
+    "reasoning": 75,
+    "costUsd": 0.00174,
+    "usedModel": "openai/gpt-6-luna",
+    "error": "",
+    "answer": "Application submitted successfully for Software Development Engineer I – Backend at Northwind. Reference number: **NW-6DU30Q**."
+  }
+]

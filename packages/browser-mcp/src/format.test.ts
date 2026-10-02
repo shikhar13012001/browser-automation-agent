@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bestOptionIndex, formatItem, formatState, type FrameData } from "./format.js";
+import { bestOptionIndex, diffState, formatItem, formatState, type FrameData } from "./format.js";
 import { normalizeAction, parseDate, resolveUploadPath } from "./actions.js";
 import { EXTRACT_SRC } from "./extract-src.js";
 import { FIND_TEXT_SRC } from "./find-text-src.js";
@@ -14,6 +14,33 @@ test("the in-page extraction script is valid JavaScript", () => {
   assert.doesNotThrow(() => new Function(`return ${EXTRACT_SRC};`));
   const invisible = [0xa0, 0x2028, 0x2029].filter((c) => EXTRACT_SRC.includes(String.fromCharCode(c)));
   assert.deepEqual(invisible, [], "invisible characters in the page script");
+});
+
+test("diffState sends only what changed on the same page, and the full state otherwise", () => {
+  const page = (rows: string[], extra: string[] = []) => ['PAGE "Form" http://x/form', ...extra, "## Details", ...rows, "(4 header/nav/footer links hidden; call state with all=true only if you need them)"].join("\n");
+  const rows = Array.from({ length: 10 }, (_, i) => `[${i + 1}] textbox "Field ${i + 1}" = ""`);
+  const before = page(rows);
+
+  assert.equal(diffState(undefined, before), before, "nothing seen yet: full state");
+
+  const filled = [...rows];
+  filled[2] = '[3] textbox "Field 3" = "hello"';
+  const d = diffState(before, page([...filled.slice(0, 9), '[11] button "Save"'], ['ERRORS: "Field 1 is required"']));
+  assert.match(d, /^PAGE "Form"/);
+  assert.match(d, /ERRORS: "Field 1 is required"/);
+  assert.match(d, /## Details\n\[3\] textbox "Field 3" = "hello"/);
+  assert.match(d, /\[11\] button "Save"/);
+  assert.match(d, /GONE: \[10\]/);
+  assert.doesNotMatch(d, /Field 5/, "unchanged rows are not repeated");
+  assert.doesNotMatch(d, /links hidden/, "an unchanged note is not repeated");
+
+  assert.match(diffState(before, before), /no visible change on the page/);
+  const other = before.replace("http://x/form", "http://x/next");
+  assert.equal(diffState(before, other), other, "different page: full state");
+  const dialog = page(rows, ['DIALOG "Confirm" is open -- work inside it:']);
+  assert.equal(diffState(before, dialog), dialog, "dialog opened: full state");
+  const allNew = page(rows.map((r) => r.replace('= ""', '= "x"')));
+  assert.equal(diffState(before, allNew), allNew, "most rows changed: full state");
 });
 
 test("the other in-page scripts are valid JavaScript", () => {

@@ -55,5 +55,7 @@ export async function look(question: string): Promise<{ answer: string; points: 
   const points = (parsed.points ?? [])
     .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
     .map((p) => ({ label: String(p.label ?? ""), x: Math.round(p.x * toCss), y: Math.round(p.y * toCss) }));
-  return { answer: String(parsed.answer ?? text).trim(), points };
+  // An empty answer told the model nothing and it went on guessing; say so instead.
+  const answer = String(parsed.answer ?? "").trim() || text.trim() || "(the vision model returned no answer -- ask a narrower question, or use state)";
+  return { answer, points };
 }

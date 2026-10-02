@@ -30,10 +30,11 @@ function getTransporter() {
 // daemon uptime (one per chrome-devtools-mcp process spawn), so `notBeforeMs` -- the timestamp the
 // current task started -- is required: without it this can silently return a screenshot from a
 // completely unrelated, much earlier task.
-export async function findLatestScreenshot(notBeforeMs: number): Promise<string | undefined> {
+export async function findLatestScreenshot(notBeforeMs: number, worker = ""): Promise<string | undefined> {
   const root = tmpdir();
-  // intent-browser (the default browser tool) saves the viewport after every action to one fixed file.
-  const own = join(root, "intent-browser", "latest.jpg");
+  // intent-browser (the default browser tool) saves the viewport after every action to one fixed
+  // file per worker (packages/browser-mcp/src/paths.ts).
+  const own = join(root, "intent-browser", worker ? `latest-${worker}.jpg` : "latest.jpg");
   try {
     if ((await stat(own)).mtimeMs >= notBeforeMs) return own;
   } catch {
@@ -71,6 +72,8 @@ export async function sendAttentionEmail(params: {
   taskStartedAt: number;
   // "Needs attention" (blocked, waiting for you) or "Failed" (gave up); shown in the subject.
   kind?: string;
+  // Which worker ran the task, so the screenshot attached is that worker's.
+  worker?: string;
 }): Promise<void> {
   const t = getTransporter();
   if (!t) {
@@ -84,7 +87,7 @@ export async function sendAttentionEmail(params: {
     return;
   }
 
-  const screenshotPath = await findLatestScreenshot(params.taskStartedAt);
+  const screenshotPath = await findLatestScreenshot(params.taskStartedAt, params.worker);
   const lines = [
     `Task: ${params.prompt}`,
     "",

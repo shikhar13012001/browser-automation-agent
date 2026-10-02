@@ -1,0 +1,26 @@
+[
+  {
+    "config": "luna-low",
+    "engine": "direct",
+    "tool": "intent-browser",
+    "model": "openai/gpt-6-luna",
+    "effort": "low",
+    "run": 1,
+    "submitted": true,
+    "fieldsCorrect": "18/18",
+    "success": true,
+    "reportedRef": true,
+    "wrongFields": [],
+    "seconds": 25,
+    "steps": 9,
+    "toolCalls": 8,
+    "freshInput": 2453,
+    "cachedInput": 70136,
+    "output": 691,
+    "reasoning": 67,
+    "costUsd": 0.00129,
+    "usedModel": "openai/gpt-6-luna",
+    "error": "",
+    "answer": "Application submitted successfully for Software Development Engineer I – Backend. Reference number: **NW-DWF85S**."
+  }
+]

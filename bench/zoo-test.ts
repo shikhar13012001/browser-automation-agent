@@ -54,6 +54,15 @@ const cases: Case[] = [
     check: (z) => z.country === "Canada",
   },
   {
+    // Models use fill on autocompletes as often as select; it must pick the suggestion too.
+    name: "fill on an autocomplete picks the suggestion",
+    steps: async () => {
+      await run([{ do: "fill", id: id("Country of residence"), value: "India" }]);
+      if (!/combobox "Country of residence" = "India"/.test(state)) throw new Error("state does not show India");
+    },
+    check: (z) => z.country === "India",
+  },
+  {
     name: "click_text finds lazy-loaded items",
     steps: () => run([{ do: "click_text", value: "Project 55" }]),
     check: (z) => z.project === 55,
